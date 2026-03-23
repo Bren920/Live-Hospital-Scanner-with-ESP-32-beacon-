@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Package, Settings, Search, Box, Radio, AlertTriangle, Lock, Unlock, Edit2 } from 'lucide-react';
+import { LayoutDashboard, Package, Settings, Search, Box, Radio, AlertTriangle, Lock, Unlock, Edit2, Wifi, Plus, Trash2 } from 'lucide-react';
 import './index.css';
 
 // Components
@@ -130,10 +130,61 @@ const SettingsView = ({ isUnlocked, setIsUnlocked, liveData }) => {
   const [nearThreshold, setNearThreshold] = useState(-65);
   const [farThreshold, setFarThreshold] = useState(-85);
 
+  const [locations, setLocations] = useState({});
+  const [newBssid, setNewBssid] = useState('');
+  const [newLocationName, setNewLocationName] = useState('');
+
+  useEffect(() => {
+    if (isUnlocked) {
+      fetchLocations();
+    }
+  }, [isUnlocked]);
+
+  const fetchLocations = async () => {
+    try {
+      const response = await fetch(`http://${window.location.hostname}:3000/api/locations`);
+      const data = await response.json();
+      setLocations(data);
+    } catch (err) {
+      console.error("Failed to fetch locations", err);
+    }
+  };
+
+  const addLocation = async (e) => {
+    e.preventDefault();
+    if (!newBssid || !newLocationName) return;
+    try {
+      await fetch(`http://${window.location.hostname}:3000/api/locations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bssid: newBssid, location: newLocationName })
+      });
+      setNewBssid('');
+      setNewLocationName('');
+      fetchLocations();
+    } catch (err) {
+      console.error("Failed to add location", err);
+    }
+  };
+
+  const deleteLocation = async (bssid) => {
+    if (!window.confirm(`Delete mapping for ${bssid}?`)) return;
+    try {
+      await fetch(`http://${window.location.hostname}:3000/api/locations/${encodeURIComponent(bssid)}`, {
+        method: 'DELETE'
+      });
+      fetchLocations();
+    } catch (err) {
+      console.error("Failed to delete location", err);
+    }
+  };
+
   const handleUnlock = (e) => {
     e.preventDefault();
-    if (adminId && password) {
+    if (adminId === 'admin123' && password === '123') {
       setIsUnlocked(true);
+    } else {
+      alert("Invalid Admin ID or Password");
     }
   };
 
@@ -148,11 +199,11 @@ const SettingsView = ({ isUnlocked, setIsUnlocked, liveData }) => {
             <form onSubmit={handleUnlock} style={{ width: '100%' }}>
               <div className="input-group">
                 <label>Admin ID</label>
-                <input type="text" placeholder="Enter your admin ID" value={adminId} onChange={e => setAdminId(e.target.value)} required />
+                <input type="text" placeholder="Enter your admin ID (admin123)" value={adminId} onChange={e => setAdminId(e.target.value)} required />
               </div>
               <div className="input-group">
                 <label>Password</label>
-                <input type="password" placeholder="Enter your password" value={password} onChange={e => setPassword(e.target.value)} required />
+                <input type="password" placeholder="Enter your password (123)" value={password} onChange={e => setPassword(e.target.value)} required />
               </div>
               <button type="submit" className="auth-btn">
                 <Unlock size={18} /> Unlock Settings
@@ -165,6 +216,42 @@ const SettingsView = ({ isUnlocked, setIsUnlocked, liveData }) => {
       <div className="content-area" style={{ filter: !isUnlocked ? 'blur(4px)' : 'none', pointerEvents: !isUnlocked ? 'none' : 'auto' }}>
         <div className="settings-grid">
           
+          <div className="settings-card">
+            <div className="settings-card-header" style={{ marginBottom: '16px' }}>
+              <Wifi size={20} className="blue" /> BSSID & Physical Location Config
+            </div>
+            
+            <form onSubmit={addLocation} style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+              <div className="input-group" style={{ flex: 1, marginBottom: 0 }}>
+                <input type="text" placeholder="WiFi BSSID (e.g., 00:11:22...)" value={newBssid} onChange={e => setNewBssid(e.target.value)} required />
+              </div>
+              <div className="input-group" style={{ flex: 1, marginBottom: 0 }}>
+                <input type="text" placeholder="Physical Location" value={newLocationName} onChange={e => setNewLocationName(e.target.value)} required />
+              </div>
+              <button type="submit" className="btn btn-primary" style={{ padding: '0 16px' }}>
+                <Plus size={18} /> Add
+              </button>
+            </form>
+
+            <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
+              {Object.keys(locations).length === 0 ? (
+                <div style={{ textAlign: 'center', color: '#64748b', padding: '16px' }}>No location mappings found.</div>
+              ) : (
+                Object.entries(locations).map(([bssid, locName]) => (
+                  <div key={bssid} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #e2e8f0' }}>
+                    <div>
+                      <div style={{ fontWeight: 500, fontSize: '0.9rem' }}>{locName}</div>
+                      <div style={{ fontSize: '0.8rem', color: '#64748b', fontFamily: 'monospace' }}>BSSID: {bssid}</div>
+                    </div>
+                    <button onClick={() => deleteLocation(bssid)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444' }}>
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
           <div className="settings-card">
             <div className="settings-card-header">
               <Settings size={20} className="blue" /> Signal Calibration
@@ -197,42 +284,42 @@ const SettingsView = ({ isUnlocked, setIsUnlocked, liveData }) => {
             </div>
           </div>
 
-          <div className="settings-row">
-            <div className="settings-card">
-              <div className="settings-card-header" style={{ justifyContent: 'space-between', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Radio size={20} className="blue" /> Beacon Management
-                </div>
-                <button className="btn btn-primary">+ Add Beacon</button>
+        </div>
+
+        <div className="settings-row" style={{ marginTop: '24px' }}>
+          <div className="settings-card">
+            <div className="settings-card-header" style={{ justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Radio size={20} className="blue" /> Beacon Management
               </div>
+              <button className="btn btn-primary">+ Add Beacon</button>
+            </div>
 
-              {liveData.slice(0,3).map((eq, i) => (
-                <div key={eq.id || i} style={{ display: 'flex', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid #e2e8f0' }}>
-                  <div>
-                    <div style={{ fontWeight: 500, fontSize: '0.9rem' }}>{eq.beaconId}</div>
-                    <div style={{ fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: eq.status === 'Active' ? '#22c55e' : '#cbd5e1', display: 'inline-block' }}></span> 
-                      {eq.location || 'Unknown'}
-                    </div>
+            {liveData.slice(0,3).map((eq, i) => (
+              <div key={eq.id || i} style={{ display: 'flex', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid #e2e8f0' }}>
+                <div>
+                  <div style={{ fontWeight: 500, fontSize: '0.9rem' }}>{eq.beaconId}</div>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: eq.status === 'Active' ? '#22c55e' : '#cbd5e1', display: 'inline-block' }}></span> 
+                    {eq.location || 'Unknown'}
                   </div>
-                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><Edit2 size={16} /></button>
                 </div>
-              ))}
-            </div>
-
-            <div className="settings-card danger-zone">
-               <div className="settings-card-header">
-                  <AlertTriangle size={20} /> System Maintenance
-               </div>
-               <div className="danger-text">
-                 <strong>Danger Zone</strong><br/>
-                 These actions cannot be undone. Please proceed with caution.
-               </div>
-               <button className="btn-danger-outline"><AlertTriangle size={16} style={{marginRight: '8px'}} /> Clear History Logs</button>
-               <button className="btn-danger-solid"><AlertTriangle size={16} style={{marginRight: '8px'}} /> Factory Reset</button>
-            </div>
+                <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><Edit2 size={16} /></button>
+              </div>
+            ))}
           </div>
 
+          <div className="settings-card danger-zone">
+             <div className="settings-card-header">
+                <AlertTriangle size={20} /> System Maintenance
+             </div>
+             <div className="danger-text">
+               <strong>Danger Zone</strong><br/>
+               These actions cannot be undone. Please proceed with caution.
+             </div>
+             <button className="btn-danger-outline"><AlertTriangle size={16} style={{marginRight: '8px'}} /> Clear History Logs</button>
+             <button className="btn-danger-solid"><AlertTriangle size={16} style={{marginRight: '8px'}} /> Factory Reset</button>
+          </div>
         </div>
       </div>
     </div>
@@ -249,7 +336,7 @@ function App() {
   useEffect(() => {
     const fetchEquipment = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/equipment');
+        const response = await fetch(`http://${window.location.hostname}:3000/api/equipment`);
         const data = await response.json();
         setLiveData(data);
       } catch (err) {

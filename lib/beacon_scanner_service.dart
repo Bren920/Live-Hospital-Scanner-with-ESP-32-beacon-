@@ -23,8 +23,8 @@ class BeaconScannerService {
   bool _isScanning = false;
   
   // IP address of the laptop running the Node.js server. 
-  final String _serverUrl = 'http://192.168.42.187:3000/api/scan'; 
-  final String _logUrl = 'http://192.168.42.187:3000/api/log';
+  final String _serverUrl = 'http://10.41.249.185:3000/api/scan'; 
+  final String _logUrl = 'http://10.41.249.185:3000/api/log';
 
   // Dynamic location set from the UI
   String selectedLocation = 'Dahlia B2 Level 3';

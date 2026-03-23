@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const PORT = 3000;
@@ -18,12 +20,24 @@ const equipmentMap = {
 };
 
 // 2. Location Mapping Repository (BSSID -> Physical Location)
-const locationMap = {
-  // Replace these with your actual router MAC addresses
-  "00:00:00:00:00:00": "Dahlia, Level 3",
-  "02:00:00:00:00:00": "Allamanda Cafe Merah",
-  "22:22:22:22:22:22": "ICU Ward",
-};
+const LOCATION_FILE = path.join(__dirname, 'locationMap.json');
+let locationMap = {};
+
+try {
+  if (fs.existsSync(LOCATION_FILE)) {
+    locationMap = JSON.parse(fs.readFileSync(LOCATION_FILE, 'utf8'));
+  } else {
+    locationMap = {
+      // Replace these with your actual router MAC addresses
+      "00:00:00:00:00:00": "Dahlia, Level 3",
+      "02:00:00:00:00:00": "Allamanda Cafe Merah",
+      "22:22:22:22:22:22": "ICU Ward",
+    };
+    fs.writeFileSync(LOCATION_FILE, JSON.stringify(locationMap, null, 2));
+  }
+} catch (error) {
+  console.error("Error loading location map:", error);
+}
 
 // 3. Live Status Tracking
 // Keeps track of what equipment we've seen recently.
@@ -121,6 +135,40 @@ app.get('/api/equipment', (req, res) => {
   }
 
   res.json(results);
+});
+
+// Endpoint: Getting the BSSID Location Map
+app.get('/api/locations', (req, res) => {
+  res.json(locationMap);
+});
+
+// Endpoint: Adding or Updating a BSSID Location Map
+app.post('/api/locations', (req, res) => {
+  const { bssid, location } = req.body;
+  if (!bssid || !location) {
+    return res.status(400).json({ error: "Missing bssid or location in payload" });
+  }
+  locationMap[bssid] = location;
+  try {
+    fs.writeFileSync(LOCATION_FILE, JSON.stringify(locationMap, null, 2));
+  } catch (error) {
+    console.error("Error saving location map:", error);
+  }
+  res.json({ success: true, locationMap });
+});
+
+// Endpoint: Deleting a BSSID Location Map
+app.delete('/api/locations/:bssid', (req, res) => {
+  const bssid = req.params.bssid;
+  if (locationMap[bssid]) {
+    delete locationMap[bssid];
+    try {
+      fs.writeFileSync(LOCATION_FILE, JSON.stringify(locationMap, null, 2));
+    } catch (error) {
+      console.error("Error saving location map:", error);
+    }
+  }
+  res.json({ success: true, locationMap });
 });
 
 // ── Server Initialize ────────────────────────────────────────────────────────
