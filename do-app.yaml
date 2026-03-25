@@ -1,0 +1,16 @@
+name: hospital-asset-tracker
+services:
+  - name: node-server
+    github:
+      branch: main
+      deploy_on_push: true
+      repo: Bren920/Live-Hospital-Scanner-with-ESP-32-beacon-
+    source_dir: server
+    build_command: npm run build:unix
+    run_command: npm start
+    envs:
+      - key: PORT
+        value: 3000
+    http_port: 3000
+    instance_count: 1
+    instance_size_slug: basic-xxs # $5/month plan

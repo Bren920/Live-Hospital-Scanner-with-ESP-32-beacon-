@@ -18,7 +18,7 @@ This is a comprehensive hospital asset tracking system that utilizes ESP32 BLE B
 ### 🌐 Cross-Network Synchronization
 - **Any-Network Connectivity**: Scanners can operate on mobile data (4G/5G) while the dashboard runs on hospital Wi-Fi.
 - **Configurable Server URL**: The Flutter app features a persistent settings menu to point to any public or local server address.
-- **Unified Hosting**: The Node.js server is configured to serve the built React dashboard directly, simplifying deployment to platforms like **Railway.app**.
+- **Unified Hosting**: The Node.js server is configured to serve the built React dashboard directly, simplifying deployment to platforms like **DigitalOcean App Platform**.
 
 ---
 
