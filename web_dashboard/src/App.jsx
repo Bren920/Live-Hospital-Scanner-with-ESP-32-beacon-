@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, Package, Settings, Search, Box, Radio, AlertTriangle, Lock, Unlock, Edit2, Wifi, Plus, Trash2, Shield, KeyRound, Eye, EyeOff } from 'lucide-react';
 import './index.css';
 
-// In production (served from server.js), use same origin. In dev (Vite on 5173/5174), target port 3000.
-const API = window.location.port === '3000' ? '' : `http://${window.location.hostname}:3000`;
+// In production (served from Node.js on same domain/cloud host), use relative paths (empty string).
+// In local Vite development (port 5173/5174), point to the local Node.js server.
+const isViteDev = window.location.port === '5173' || window.location.port === '5174';
+const API = isViteDev ? `http://${window.location.hostname}:3000` : '';
 
 // Components
 const Sidebar = ({ activeTab, setActiveTab }) => (
