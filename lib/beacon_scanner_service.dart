@@ -252,7 +252,7 @@ class BeaconScannerService {
 
   Future<void> _uploadBeaconsToServer() async {
     if (_beacons.isEmpty) {
-      await _sendLog("Upload timer ran, but 0 beacons detected.");
+      print("Upload timer ran, but 0 beacons detected.");
       return;
     }
 
@@ -265,51 +265,60 @@ class BeaconScannerService {
     }
 
     int uploadsAttempted = 0;
+    final List<Future<void>> uploadTasks = [];
+
     for (final beacon in _beacons.values) {
       if (beacon.name.toLowerCase().contains("esp32") ||
           beacon.name.toLowerCase().contains("ibeacon")) {
-        await _sendLog(
+        // Print locally instead of sending an HTTP log request every 3 seconds to avoid network spam and lag
+        print(
           "Found ESP32/iBeacon! MAC: ${beacon.id}, Major: ${beacon.major}, Raw Payload: ${beacon.rawData}",
         );
       }
 
       if (beacon.major != null) {
         uploadsAttempted++;
-        try {
-          // Send specific ESP32 detected Major and RSSI to the live Dashboard Server
-          await http
-              .post(
-                Uri.parse('$_serverBase/api/scan'),
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Bypass-Tunnel-Reminder': 'true',
-                },
-                body: jsonEncode({
-                  'major': beacon.major,
-                  'rssi': beacon.rssi,
-                  'mac': beacon.id,
-                  'distance': beacon.distance,
-                  'zone': BeaconDevice.classifyZone(
-                    beacon.rssi,
-                    nearThreshold: _nearThreshold,
-                    farThreshold: _farThreshold,
-                  ),
-                  'location':
-                      selectedLocation, // Using standard UI selected location fallback
-                  'bssid': wifiBSSID,
-                }),
-              )
-              .timeout(const Duration(seconds: 2));
-        } catch (e) {
-          await _sendLog(
-            "HTTP ERROR sending scan for Major ${beacon.major} to $_serverBase/api/scan: $e",
-          );
-        }
+        
+        // Add to a list of futures so we don't block the loop with sequential awaits
+        uploadTasks.add(() async {
+          try {
+            await http
+                .post(
+                  Uri.parse('$_serverBase/api/scan'),
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Bypass-Tunnel-Reminder': 'true',
+                  },
+                  body: jsonEncode({
+                    'major': beacon.major,
+                    'rssi': beacon.rssi,
+                    'mac': beacon.id,
+                    'distance': beacon.distance,
+                    'zone': BeaconDevice.classifyZone(
+                      beacon.rssi,
+                      nearThreshold: _nearThreshold,
+                      farThreshold: _farThreshold,
+                    ),
+                    'location':
+                        selectedLocation, // Using standard UI selected location fallback
+                    'bssid': wifiBSSID,
+                  }),
+                )
+                .timeout(const Duration(seconds: 2));
+          } catch (e) {
+            print(
+              "HTTP ERROR sending scan for Major ${beacon.major} to $_serverBase/api/scan: $e",
+            );
+          }
+        }());
       }
     }
 
-    if (uploadsAttempted == 0) {
-      await _sendLog(
+    // Execute all uploads concurrently
+    if (uploadTasks.isNotEmpty) {
+      await Future.wait(uploadTasks);
+    } else {
+      print(
         "Checked ${_beacons.length} BLE devices, but NONE had a Major value to upload.",
       );
     }

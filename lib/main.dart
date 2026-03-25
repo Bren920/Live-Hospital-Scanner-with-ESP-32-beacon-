@@ -58,16 +58,7 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
   late Animation<double> _pulseAnimation;
 
   StreamSubscription<List<BeaconDevice>>? _beaconSub;
-  
-  // Dynamic Locations
-  final List<String> _locations = [
-    'Dahlia B2 Level 3', 
-    'Emergency Room', 
-    'Radiology', 
-    'ICU Ward 2', 
-    'Pediatrics'
-  ];
-  String _currentLocation = 'Dahlia B2 Level 3';
+  Timer? _uiUpdateTimer;
 
   @override
   void initState() {
@@ -91,6 +82,7 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
   void dispose() {
     _pulseController.dispose();
     _beaconSub?.cancel();
+    _uiUpdateTimer?.cancel();
     _scanner.stopScan();
     super.dispose();
   }
@@ -183,11 +175,19 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
       });
       _pulseController.repeat(reverse: true);
 
+      List<BeaconDevice> latestBeacons = [];
       _beaconSub = _scanner.beaconStream.listen((beacons) {
-        setState(() {
-          _beacons = beacons;
-          _lastUpdated = DateTime.now();
-        });
+        latestBeacons = beacons;
+      });
+
+      _uiUpdateTimer?.cancel();
+      _uiUpdateTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+        if (mounted && _isScanning) {
+          setState(() {
+            _beacons = latestBeacons;
+            _lastUpdated = DateTime.now();
+          });
+        }
       });
 
       await _scanner.startScan();
@@ -197,12 +197,15 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
         _isScanning = false;
       });
       _pulseController.stop();
+      _uiUpdateTimer?.cancel();
     }
   }
 
   Future<void> _stopScan() async {
     await _beaconSub?.cancel();
     _beaconSub = null;
+    _uiUpdateTimer?.cancel();
+    _uiUpdateTimer = null;
     await _scanner.stopScan();
     setState(() {
       _isScanning = false;
@@ -430,9 +433,7 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
     if (!_filterByEsp32) return _beacons;
     return _beacons.where((b) {
       final name = b.name.toLowerCase();
-      return name.contains('esp32') ||
-          name.contains('ibeacon') ||
-          b.uuid != null; // Show if it has iBeacon data
+      return name.contains('esp32') || b.major != null;
     }).toList();
   }
 
@@ -632,56 +633,29 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
                       ],
                     ),
                     const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        // Location Dropdown
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                value: _currentLocation,
-                                isExpanded: true,
-                                icon: const Icon(Icons.location_on, color: Colors.blueGrey, size: 20),
-                                style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black87),
-                                items: _locations.map((loc) => DropdownMenuItem(
-                                  value: loc,
-                                  child: Text(loc),
-                                )).toList(),
-                                onChanged: (val) {
-                                  if (val != null) {
-                                    setState(() => _currentLocation = val);
-                                    _scanner.selectedLocation = val;
-                                  }
-                                },
-                              ),
-                            ),
+                    // Prominent Scan Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: _toggleScan,
+                        icon: Icon(
+                          _isScanning ? Icons.stop : Icons.search,
+                          size: 20,
+                        ),
+                        label: Text(
+                          _isScanning ? 'Stop Scanning' : 'Start Scanning',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        ),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _isScanning
+                              ? Colors.redAccent
+                              : const Color(0xFF00C853),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        // Scan Button
-                        FilledButton.icon(
-                          onPressed: _toggleScan,
-                          icon: Icon(
-                            _isScanning ? Icons.stop : Icons.search,
-                            size: 18,
-                          ),
-                          label: Text(_isScanning ? 'Stop' : 'Scan'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: _isScanning
-                                ? Colors.redAccent
-                                : const Color(0xFF00C853),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 12,
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
