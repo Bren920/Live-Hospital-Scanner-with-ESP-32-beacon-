@@ -99,6 +99,7 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
         Permission.bluetoothScan,
         Permission.bluetoothConnect,
         Permission.locationWhenInUse,
+        Permission.locationAlways, // Some devices need this for background BLE
       ].request();
 
       // Check if location services are enabled (crucial for some Android devices)
@@ -123,7 +124,13 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
             s == PermissionStatus.permanentlyDenied,
       );
 
-      if (anyDenied) {
+      // We won't block completely if just locationAlways is denied, but we need the others
+      final criticalDenied = statuses[Permission.bluetoothScan] == PermissionStatus.denied ||
+                             statuses[Permission.bluetoothConnect] == PermissionStatus.denied ||
+                             statuses[Permission.locationWhenInUse] == PermissionStatus.denied;
+
+
+      if (criticalDenied) {
         setState(() => _statusMessage = 'Permissions denied.');
         if (mounted) {
           _showPermissionDialog();

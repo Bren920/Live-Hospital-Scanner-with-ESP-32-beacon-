@@ -3,8 +3,8 @@
 
     <!-- Bluetooth permissions required by flutter_blue_plus -->
     <!-- For Android 12+ (API 31+) -->
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
-        android:usesPermissionFlags="neverForLocation" />
+    <!-- Removed usesPermissionFlags="neverForLocation" because some beacons/devices require location to scan -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
     <!-- For Android 11 and below -->
