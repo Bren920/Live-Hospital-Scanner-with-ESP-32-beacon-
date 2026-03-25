@@ -123,13 +123,25 @@ app.post('/api/scan', (req, res) => {
 
   // Determine location based on BSSID
   let finalLocation = 'Unknown';
-  if (bssid && locationMap[bssid]) {
-    finalLocation = locationMap[bssid];
-    console.log(`[Location Mapped] BSSID ${bssid} -> ${finalLocation}`);
+  if (bssid) {
+    // Some devices might report BSSID with different casing or missing quotes
+    const normalizedBssid = bssid.toLowerCase().replace(/"/g, '');
+    
+    // Find a match case-insensitively
+    const matchKey = Object.keys(locationMap).find(
+      key => key.toLowerCase() === normalizedBssid
+    );
+
+    if (matchKey) {
+      finalLocation = locationMap[matchKey];
+      console.log(`[Location Mapped] BSSID ${normalizedBssid} -> ${finalLocation}`);
+    } else if (location) {
+      // Fallback to whatever the app sends
+      finalLocation = location;
+      console.log(`[Unknown BSSID] ${normalizedBssid} - using fallback location: ${location}`);
+    }
   } else if (location) {
-    // Fallback to whatever the app sends
     finalLocation = location;
-    if (bssid) console.log(`[Unknown BSSID] ${bssid} - using fallback location: ${location}`);
   }
 
   console.log(`[${new Date().toLocaleTimeString()}] Incoming scan from ${clientIp} - Major: ${major}, Location: ${finalLocation}`);
