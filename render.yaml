@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: hospital-asset-tracker
+    env: node
+    region: singapore # Closest region for typical APAC deployments, change if needed
+    plan: free
+    rootDir: server
+    buildCommand: npm run build:unix
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 3000
