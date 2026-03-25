@@ -14,6 +14,13 @@ This is a comprehensive hospital asset tracking system that utilizes ESP32 BLE B
 - **Real-Time Tuning**: Adjustable RSSI thresholds (Near/Far zones) via interactive sliders.
 - **Environmental Adaptation**: Configurable Path Loss Exponent ($n$) and Tx Power settings to adapt to different hospital ward environments.
 - **Live Signal Visualization**: View raw RSSI values from active beacons for immediate calibration feedback.
+- **Estimated Distance Calculation**: Advanced distance estimation algorithms accurately calculate proximity in meters based on server-calibrated signals.
+
+### 🔋 Optimized Mobile Tracking
+- **Aggressive Battery Saving**: Employs a smart 10-second wake/sleep cycle, turning off the Bluetooth radio when not actively polling to reduce drain.
+- **Persistent Background Execution**: Runs continuously as an Android foreground service, allowing for uninterrupted tracking even when the phone is locked.
+- **Clean Architecture**: Refactored to eliminate unused dependencies, platform targets, and legacy logs, resulting in a significantly lighter and smoother application.
+
 
 ### 🌐 Cross-Network Synchronization
 - **Any-Network Connectivity**: Scanners can operate on mobile data (4G/5G) while the dashboard runs on hospital Wi-Fi.
