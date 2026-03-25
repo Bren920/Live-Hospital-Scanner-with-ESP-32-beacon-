@@ -56,3 +56,12 @@ server/calibration.json
 server/equipmentMap.json
 server/locationMap.json
 server/package-lock.json
+
+# Unused platform targets (Android-only app)
+/linux/
+/windows/
+/web/
+
+# Local APK build artifacts
+/apks/
+/releases/

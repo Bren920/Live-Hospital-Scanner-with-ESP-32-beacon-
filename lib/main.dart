@@ -1,13 +1,79 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:flutter_background_service_android/flutter_background_service_android.dart';
 
 import 'beacon_model.dart';
 import 'beacon_scanner_service.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeService();
   runApp(const HospitalScannerApp());
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Background Service Setup
+// ─────────────────────────────────────────────────────────────────────────────
+
+Future<void> initializeService() async {
+  final service = FlutterBackgroundService();
+
+  await service.configure(
+    androidConfiguration: AndroidConfiguration(
+      onStart: onStart,
+      autoStart: false,
+      isForegroundMode: true,
+      notificationChannelId: 'hospital_scanner_channel',
+      initialNotificationTitle: 'Hospital Scanner',
+      initialNotificationContent: 'Running in background',
+      foregroundServiceNotificationId: 888,
+    ),
+    iosConfiguration: IosConfiguration(
+      autoStart: false,
+      onForeground: onStart,
+      onBackground: onIosBackground,
+    ),
+  );
+}
+
+@pragma('vm:entry-point')
+Future<bool> onIosBackground(ServiceInstance service) async {
+  return true;
+}
+
+@pragma('vm:entry-point')
+void onStart(ServiceInstance service) async {
+  DartPluginRegistrant.ensureInitialized();
+
+  if (service is AndroidServiceInstance) {
+    service.on('setAsForeground').listen((event) {
+      service.setAsForegroundService();
+    });
+
+    service.on('setAsBackground').listen((event) {
+      service.setAsBackgroundService();
+    });
+  }
+
+  service.on('stopService').listen((event) {
+    service.stopSelf();
+  });
+
+  // Start the beacon scanner in the background isolate
+  final scanner = BeaconScannerService.instance;
+  await scanner.loadServerUrl();
+  await scanner.startScan();
+  
+  if (service is AndroidServiceInstance) {
+    service.setForegroundNotificationInfo(
+      title: "Hospital Scanner Active",
+      content: "Scanning for medical equipment...",
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -177,7 +243,7 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
   Future<void> _startScan() async {
     try {
       setState(() {
-        _statusMessage = 'Scanning for beacons…';
+        _statusMessage = 'Scanning for beacons (Battery Saving Mode)…';
         _isScanning = true;
       });
       _pulseController.repeat(reverse: true);
@@ -188,11 +254,23 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
       });
 
       _uiUpdateTimer?.cancel();
-      _uiUpdateTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      _uiUpdateTimer = Timer.periodic(const Duration(milliseconds: 500), (_) async {
         if (mounted && _isScanning) {
+          // Check if FlutterBluePlus is actually scanning right now
+          final isCurrentlyScanning = await FlutterBluePlus.isScanning.first;
+          
           setState(() {
             _beacons = latestBeacons;
             _lastUpdated = DateTime.now();
+            
+            // Update UI to show sleep/wake cycle
+            if (isCurrentlyScanning) {
+              _statusMessage = 'Scanning for beacons (Active)…';
+              if (!_pulseController.isAnimating) _pulseController.repeat(reverse: true);
+            } else {
+              _statusMessage = 'Sleeping to save battery (10s)…';
+              _pulseController.stop();
+            }
           });
         }
       });

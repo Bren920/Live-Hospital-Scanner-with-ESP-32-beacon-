@@ -48,7 +48,9 @@ class BeaconScannerService {
   }
 
   // Dynamic location set from the UI
-  String selectedLocation = 'Dahlia B2 Level 3';
+  // We removed the dropdown, but we still need a default.
+  // Instead of 'Dahlia B2 Level 3', let's use 'Unknown Location' so it's obvious when BSSID mapping fails.
+  String selectedLocation = 'Unknown Location';
 
   Timer? _uploadTimer;
   Timer? _calibrationTimer;
@@ -154,25 +156,27 @@ class BeaconScannerService {
       _controller.add(sorted);
     });
 
-    // Start the actual scan
-    // Using lowLatency for better results on some devices (like Huawei)
+    // Start the actual scan with balanced mode to save battery
     await FlutterBluePlus.startScan(
       timeout: const Duration(seconds: 10),
       continuousUpdates: true,
-      androidScanMode: AndroidScanMode.lowLatency,
+      androidScanMode: AndroidScanMode.balanced,
     );
 
-    // When the built-in scan times out, restart it so we keep getting updates
+    // Battery Saving Cycle: Scan for 10s, Sleep for 10s, then restart scan
     _scanningStateSub = FlutterBluePlus.isScanning.listen((scanning) async {
       if (!scanning && _isScanning) {
-        // Small delay to prevent tight loops if something is wrong
-        await Future.delayed(const Duration(milliseconds: 500));
+        // Sleep for 10 seconds to save battery
+        print('💤 Sleeping for 10 seconds to save battery...');
+        await Future.delayed(const Duration(seconds: 10));
+        
         if (_isScanning) {
           try {
+            print('🔍 Waking up and starting 10 second scan...');
             await FlutterBluePlus.startScan(
               timeout: const Duration(seconds: 10),
               continuousUpdates: true,
-              androidScanMode: AndroidScanMode.lowLatency,
+              androidScanMode: AndroidScanMode.balanced,
             );
           } catch (e) {
             // Ignore errors during restart (e.g. if adapter turned off)
@@ -260,6 +264,12 @@ class BeaconScannerService {
     String? wifiBSSID;
     try {
       wifiBSSID = await NetworkInfo().getWifiBSSID();
+      // If the app doesn't have precise location permissions or GPS is off, Android returns null or "02:00:00:00:00:00"
+      if (wifiBSSID != null) {
+         print("Successfully fetched BSSID from phone: $wifiBSSID");
+      } else {
+         print("Warning: NetworkInfo().getWifiBSSID() returned null.");
+      }
     } catch (e) {
       print("Warning: Failed to get BSSID: $e");
     }
