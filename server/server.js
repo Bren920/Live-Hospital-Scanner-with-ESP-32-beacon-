@@ -138,10 +138,11 @@ app.post('/api/scan', (req, res) => {
     } else if (location) {
       // Fallback to whatever the app sends
       finalLocation = location;
-      console.log(`[Unknown BSSID] ${normalizedBssid} - using fallback location: ${location}`);
+      console.log(`[Unknown BSSID] Received: '${bssid}' (normalized: '${normalizedBssid}') - using fallback location: ${location}`);
     }
   } else if (location) {
     finalLocation = location;
+    console.log(`[No BSSID Received] The app did not send a BSSID. Using fallback location: ${location}`);
   }
 
   console.log(`[${new Date().toLocaleTimeString()}] Incoming scan from ${clientIp} - Major: ${major}, Location: ${finalLocation}`);
@@ -227,7 +228,11 @@ app.post('/api/locations', (req, res) => {
   if (!bssid || !location) {
     return res.status(400).json({ error: "Missing bssid or location in payload" });
   }
-  locationMap[bssid] = location;
+  
+  // Normalize the BSSID to lowercase before saving so it matches the scan logic
+  const normalizedBssid = bssid.toLowerCase().replace(/"/g, '');
+  locationMap[normalizedBssid] = location;
+  
   try {
     fs.writeFileSync(LOCATION_FILE, JSON.stringify(locationMap, null, 2));
   } catch (error) {
