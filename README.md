@@ -1,60 +1,70 @@
 # Live Hospital Asset Scanner with ESP32 Beacons
 
-This is a comprehensive hospital asset tracking system that utilizes ESP32 BLE Beacons to accurately track the live locations of mobile medical equipment (like ECG machines, portable X-rays, wheelchairs) across different wards. 
+This is a comprehensive hospital asset tracking system that utilizes ESP32 BLE Beacons to accurately track the live locations of mobile medical equipment (like ECG machines, portable X-rays, wheelchairs) across different wards.
 
-## 📦 Download the App
-You can download the compiled Android app directly here:
-**[⬇️ Download `hospital-scanner.apk`](./releases/hospital-scanner.apk)**
+## ✨ Advanced Features
 
-*(Note: Ensure your Android device has "Install from Unknown Sources" enabled to successfully install the app.)*
+### 🛡️ Superadmin System
+- **Role-Based Access Control**: Separate views for **Admin** (day-to-day management) and **Superadmin** (technical configuration).
+- **Secure Authentication**: Backend-verified credentials for all administrative actions.
+- **Password Management**: Superadmin can update system credentials directly from the dashboard.
+- **System Maintenance**: "Danger Zone" tools for factory resets and clearing history logs.
+
+### 📐 Precision Signal Calibration
+- **Real-Time Tuning**: Adjustable RSSI thresholds (Near/Far zones) via interactive sliders.
+- **Environmental Adaptation**: Configurable Path Loss Exponent ($n$) and Tx Power settings to adapt to different hospital ward environments.
+- **Live Signal Visualization**: View raw RSSI values from active beacons for immediate calibration feedback.
+
+### 🌐 Cross-Network Synchronization
+- **Any-Network Connectivity**: Scanners can operate on mobile data (4G/5G) while the dashboard runs on hospital Wi-Fi.
+- **Configurable Server URL**: The Flutter app features a persistent settings menu to point to any public or local server address.
+- **Unified Hosting**: The Node.js server is configured to serve the built React dashboard directly, simplifying deployment to platforms like **Render** or **Railway**.
 
 ---
 
 ## 🏗️ System Architecture
 
-This full-stack system consists of three main components:
+1. **Flutter Mobile App (`/lib`)**
+   - **Continuous BLE Scanning**: Rapid detection of ESP32-based iBeacon signals.
+   - **Smart Filtering**: Ignores non-hospital Bluetooth noise.
+   - **Persistence**: Remembers server configuration across app restarts using `shared_preferences`.
 
-1. **Flutter Mobile App (`/lib`)** 
-   - Acts as a moving scanner to continuously detect nearby ESP32 Beacons via Bluetooth Low Energy (BLE).
-   - Calculates the approximate distances based on Received Signal Strength Indicator (RSSI) values.
-   - Synchronizes live MAC addresses, beacon data, and current location tracking back to the central server.
-   
 2. **Node.js Express Server (`/server`)**
-   - The central nervous system acting as a bridge between the mobile scanners and the front-end dashboard.
-   - Maintains a live memory of recently seen equipment, filtering out inactive/stale devices.
-   - Maps raw beacon MAC addresses and router BSSIDs to human-readable hospital locations (e.g. "Dahlia, Level 3", "ICU Ward").
+   - **Unified Backend**: Serves both API endpoints and the static React dashboard.
+   - **Location Mapping**: Intelligent mapping of BSSIDs and MAC addresses to physical hospital wards.
+   - **Role-Based API**: Protected endpoints for credential verification and system resets.
 
 3. **React Web Dashboard (`/web_dashboard`)**
-   - A beautiful, real-time frontend dashboard for hospital staff.
-   - Visually displays all active equipment and their exact current locations within the hospital.
-   - Refreshes automatically to always maintain a "Live" view of the hospital floor.
+   - **Real-Time Monitoring**: Dynamic updates without page refreshes.
+   - **Calibration Suite**: Advanced interface for technical signal tuning.
+   - **Mobile-Responsive**: Clean, premium UI designed for both tablets and desktop monitors.
 
-## 🚀 Getting Started for Developers
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
 - [Flutter SDK](https://docs.flutter.dev/get-started/install)
-- [Node.js](https://nodejs.org/en/) (v16+)
-- [Git](https://git-scm.com/)
+- [Node.js](https://nodejs.org/en/) (v18+)
 
-### Running the Server
-```bash
-cd server
-npm i
-node server.js
-```
+### Unified Local Setup
+The easiest way to run the full system locally:
 
-### Running the Web Dashboard (React)
-```bash
-cd web_dashboard
-npm i
-npm run dev
-```
-
-### Running the Mobile App (Flutter)
-```bash
-flutter pub get
-flutter run
-```
+1. **Build the Dashboard**:
+   ```bash
+   cd server
+   npm run build
+   ```
+2. **Start the Unified Server**:
+   ```bash
+   npm start
+   ```
+3. **Launch the Scanner (Flutter)**:
+   ```bash
+   cd ..
+   flutter run
+   ```
+   *Then, use the ⚙️ icon in the app to set the server address to your computer's IP.*
 
 ---
 *Created as part of a Final Year Project building robust IoT asset tracking capabilities for modern healthcare settings.*
