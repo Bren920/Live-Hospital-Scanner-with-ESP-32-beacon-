@@ -1,11 +1,13 @@
 {
-  "name": "server",
+  "name": "hospital-asset-server",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Hospital Asset Tracker — API and Dashboard server",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "tunnel": "npx localtunnel --port 3000 --subdomain hospital-scanner-fyp",
+    "dev": "node server.js",
+    "build": "cd ../web_dashboard && npm install && npm run build && xcopy /E /I /Y dist ..\\server\\public",
+    "build:unix": "cd ../web_dashboard && npm install && npm run build && cp -r dist/* ../server/public/",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

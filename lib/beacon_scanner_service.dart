@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:network_info_plus/network_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'beacon_model.dart';
 
@@ -21,15 +22,46 @@ class BeaconScannerService {
   StreamSubscription<List<ScanResult>>? _scanSub;
   StreamSubscription<bool>? _scanningStateSub;
   bool _isScanning = false;
-  
-  // IP address of the laptop running the Node.js server. 
-  final String _serverUrl = 'http://10.41.249.185:3000/api/scan'; 
-  final String _logUrl = 'http://10.41.249.185:3000/api/log';
+
+  // IP address of the server running the Node.js backend.
+  // This is now configurable from the UI and persisted across restarts.
+  static const _prefKey = 'server_url';
+  String _serverBase = 'http://10.103.72.185:3000';
+
+  String get serverUrl => _serverBase;
+
+  /// Load the saved server URL from SharedPreferences
+  Future<void> loadServerUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(_prefKey);
+    if (saved != null && saved.isNotEmpty) {
+      _serverBase = saved;
+    }
+  }
+
+  /// Update and persist the server URL
+  Future<void> setServerUrl(String url) async {
+    // Remove trailing slash if present
+    _serverBase = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefKey, _serverBase);
+  }
 
   // Dynamic location set from the UI
   String selectedLocation = 'Dahlia B2 Level 3';
 
   Timer? _uploadTimer;
+  Timer? _calibrationTimer;
+
+  // Calibration values (fetched from server)
+  double _pathLossExponent = 2.5;
+  int _txPowerCalibration = -59;
+  int _nearThreshold = -65;
+  int _farThreshold = -85;
+
+  // Public getters so the UI can use server calibration
+  int get nearThreshold => _nearThreshold;
+  int get farThreshold => _farThreshold;
 
   // ── Public API ─────────────────────────────────────────────────────────────
 
@@ -51,6 +83,15 @@ class BeaconScannerService {
     }
 
     _isScanning = true;
+
+    // Fetch calibration from server
+    await _fetchCalibration();
+
+    // Periodically refresh calibration from server (every 30 seconds)
+    _calibrationTimer?.cancel();
+    _calibrationTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _fetchCalibration();
+    });
 
     // Start background timer to upload detected beacons to the web dashboard
     _uploadTimer?.cancel();
@@ -99,6 +140,8 @@ class BeaconScannerService {
           distance: BeaconDevice.calculateDistance(
             result.rssi,
             iBeaconData?['txPower'],
+            pathLossExponent: _pathLossExponent,
+            txPowerCalibration: _txPowerCalibration,
           ),
         );
 
@@ -147,9 +190,11 @@ class BeaconScannerService {
     _scanSub = null;
     await _scanningStateSub?.cancel();
     _scanningStateSub = null;
-    
+
     _uploadTimer?.cancel();
     _uploadTimer = null;
+    _calibrationTimer?.cancel();
+    _calibrationTimer = null;
 
     // Check if actually scanning before stopping to avoid errors
     if (await FlutterBluePlus.isScanning.first) {
@@ -161,18 +206,47 @@ class BeaconScannerService {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  Future<void> _sendLog(String message) async {
-    print("🏥 [HOSPITAL SCANNER LOG]: $message"); // Print locally to Cursor IDE console
+  /// Fetch calibration settings from the server
+  Future<void> _fetchCalibration() async {
     try {
-      await http.post(
-        Uri.parse(_logUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'Bypass-Tunnel-Reminder': 'true'
-        },
-        body: jsonEncode({'message': message}),
-      ).timeout(const Duration(seconds: 1));
-    // ignore: empty_catches
+      final response = await http
+          .get(
+            Uri.parse('$_serverBase/api/calibration'),
+            headers: {'Bypass-Tunnel-Reminder': 'true'},
+          )
+          .timeout(const Duration(seconds: 3));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        _pathLossExponent = (data['pathLossExponent'] ?? 2.5).toDouble();
+        _txPowerCalibration = (data['txPowerCalibration'] ?? -59).toInt();
+        _nearThreshold = (data['nearThreshold'] ?? -65).toInt();
+        _farThreshold = (data['farThreshold'] ?? -85).toInt();
+        print(
+          '📐 Calibration loaded: n=$_pathLossExponent, txCal=$_txPowerCalibration, near=$_nearThreshold, far=$_farThreshold',
+        );
+      }
+    } catch (e) {
+      print('Warning: Failed to fetch calibration, using defaults: $e');
+    }
+  }
+
+  Future<void> _sendLog(String message) async {
+    print(
+      "🏥 [HOSPITAL SCANNER LOG]: $message",
+    ); // Print locally to Cursor IDE console
+    try {
+      await http
+          .post(
+            Uri.parse('$_serverBase/api/log'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Bypass-Tunnel-Reminder': 'true',
+            },
+            body: jsonEncode({'message': message}),
+          )
+          .timeout(const Duration(seconds: 1));
+      // ignore: empty_catches
     } catch (e) {}
   }
 
@@ -192,37 +266,52 @@ class BeaconScannerService {
 
     int uploadsAttempted = 0;
     for (final beacon in _beacons.values) {
-      if (beacon.name.toLowerCase().contains("esp32") || beacon.name.toLowerCase().contains("ibeacon")) {
-        await _sendLog("Found ESP32/iBeacon! MAC: ${beacon.id}, Major: ${beacon.major}, Raw Payload: ${beacon.rawData}");
+      if (beacon.name.toLowerCase().contains("esp32") ||
+          beacon.name.toLowerCase().contains("ibeacon")) {
+        await _sendLog(
+          "Found ESP32/iBeacon! MAC: ${beacon.id}, Major: ${beacon.major}, Raw Payload: ${beacon.rawData}",
+        );
       }
-      
+
       if (beacon.major != null) {
         uploadsAttempted++;
         try {
           // Send specific ESP32 detected Major and RSSI to the live Dashboard Server
-          await http.post(
-            Uri.parse(_serverUrl),
-            headers: {
-              'Content-Type': 'application/json',
-              'Bypass-Tunnel-Reminder': 'true'
-            },
-            body: jsonEncode({
-              'major': beacon.major,
-              'rssi': beacon.rssi,
-              'mac': beacon.id,
-              'distance': beacon.distance,
-              'location': selectedLocation, // Using standard UI selected location fallback
-              'bssid': wifiBSSID,
-            }),
-          ).timeout(const Duration(seconds: 2));
+          await http
+              .post(
+                Uri.parse('$_serverBase/api/scan'),
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Bypass-Tunnel-Reminder': 'true',
+                },
+                body: jsonEncode({
+                  'major': beacon.major,
+                  'rssi': beacon.rssi,
+                  'mac': beacon.id,
+                  'distance': beacon.distance,
+                  'zone': BeaconDevice.classifyZone(
+                    beacon.rssi,
+                    nearThreshold: _nearThreshold,
+                    farThreshold: _farThreshold,
+                  ),
+                  'location':
+                      selectedLocation, // Using standard UI selected location fallback
+                  'bssid': wifiBSSID,
+                }),
+              )
+              .timeout(const Duration(seconds: 2));
         } catch (e) {
-          await _sendLog("HTTP ERROR sending scan for Major ${beacon.major} to $_serverUrl: $e");
+          await _sendLog(
+            "HTTP ERROR sending scan for Major ${beacon.major} to $_serverBase/api/scan: $e",
+          );
         }
       }
     }
-    
+
     if (uploadsAttempted == 0) {
-      await _sendLog("Checked ${_beacons.length} BLE devices, but NONE had a Major value to upload.");
+      await _sendLog(
+        "Checked ${_beacons.length} BLE devices, but NONE had a Major value to upload.",
+      );
     }
   }
 
@@ -235,13 +324,15 @@ class BeaconScannerService {
     if (manufacturerData.containsKey(0x004C)) {
       final data = manufacturerData[0x004C]!;
       // Log the payload so we can see what the ESP32 is actually sending
-      _sendLog("0x004C payload length: ${data.length}, data: [${data.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}]");
+      _sendLog(
+        "0x004C payload length: ${data.length}, data: [${data.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}]",
+      );
 
       // Often ESP32s send 21 bytes (stripped 0x02 0x15 headers) or 23 bytes (full)
       if (data.length >= 21) {
         // Assume if it's 21, the headers are stripped. If 23, they are present.
         int offset = (data[0] == 0x02 && data[1] == 0x15) ? 2 : 0;
-        
+
         final uuidBytes = data.sublist(offset, offset + 16);
         final uuid =
             '${_toHex(uuidBytes.sublist(0, 4))}-'

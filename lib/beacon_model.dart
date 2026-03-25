@@ -72,16 +72,25 @@ class BeaconDevice {
 
   /// Helper to calculate distance based on RSSI and TxPower
   /// Distance = 10 ^ ((TxPower - RSSI) / (10 * n))
-  /// n is the path loss exponent (typically 2.0 to 4.0, using 2.0 for free space)
-  static double calculateDistance(int rssi, int? txPower) {
-    if (txPower == null) return -1.0;
+  /// n is the path loss exponent (typically 2.0 to 4.0)
+  /// txPowerCalibration overrides the beacon-reported txPower if provided
+  static double calculateDistance(int rssi, int? txPower, {double pathLossExponent = 2.5, int? txPowerCalibration}) {
+    final effectiveTxPower = txPowerCalibration ?? txPower;
+    if (effectiveTxPower == null) return -1.0;
     if (rssi == 0) return -1.0;
 
-    final ratio = rssi * 1.0 / txPower;
+    final ratio = rssi * 1.0 / effectiveTxPower;
     if (ratio < 1.0) {
       return pow(ratio, 10).toDouble();
     } else {
-      return (0.89976) * pow(ratio, 7.7095) + 0.111;
+      return (0.89976) * pow(ratio, 7.7095 * (pathLossExponent / 2.0)) + 0.111;
     }
+  }
+
+  /// Classify the zone based on RSSI thresholds
+  static String classifyZone(int rssi, {int nearThreshold = -65, int farThreshold = -85}) {
+    if (rssi >= nearThreshold) return 'Near';
+    if (rssi >= farThreshold) return 'Mid';
+    return 'Far';
   }
 }

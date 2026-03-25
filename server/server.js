@@ -4,20 +4,32 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
 
+// Serve the built React dashboard from the public folder
+app.use(express.static(path.join(__dirname, 'public')));
+
 // 1. Hardware Mapping Repository
-// In a real app, this would be a database table mapping 
-// ESP32 "Major" values to specific medical equipment.
-const equipmentMap = {
-  // Mapping by Major value (using string keys for easy lookup)
-  "100": { id: 'EQ-2024-001', name: 'Portable X-Ray Machine', beaconId: 'BCN-4521', category: 'Imaging Equipment' },
-  "101": { id: 'EQ-2024-002', name: 'Ultrasound Scanner', beaconId: 'BCN-4522', category: 'Imaging Equipment' },
-  "102": { id: 'EQ-2024-004', name: 'Infusion Pump', beaconId: 'BCN-4524', category: 'Patient Care' },
-};
+const EQUIPMENT_FILE = path.join(__dirname, 'equipmentMap.json');
+let equipmentMap = {};
+
+try {
+  if (fs.existsSync(EQUIPMENT_FILE)) {
+    equipmentMap = JSON.parse(fs.readFileSync(EQUIPMENT_FILE, 'utf8'));
+  } else {
+    equipmentMap = {
+      "100": { id: 'EQ-2024-001', name: 'Portable X-Ray Machine', beaconId: 'BCN-4521', category: 'Imaging Equipment' },
+      "101": { id: 'EQ-2024-002', name: 'Ultrasound Scanner', beaconId: 'BCN-4522', category: 'Imaging Equipment' },
+      "102": { id: 'EQ-2024-004', name: 'Infusion Pump', beaconId: 'BCN-4524', category: 'Patient Care' },
+    };
+    fs.writeFileSync(EQUIPMENT_FILE, JSON.stringify(equipmentMap, null, 2));
+  }
+} catch (error) {
+  console.error("Error loading equipment map:", error);
+}
 
 // 2. Location Mapping Repository (BSSID -> Physical Location)
 const LOCATION_FILE = path.join(__dirname, 'locationMap.json');
@@ -39,10 +51,56 @@ try {
   console.error("Error loading location map:", error);
 }
 
-// 3. Live Status Tracking
+// 3. Calibration Settings
+const CALIBRATION_FILE = path.join(__dirname, 'calibration.json');
+let calibrationSettings = {};
+
+try {
+  if (fs.existsSync(CALIBRATION_FILE)) {
+    calibrationSettings = JSON.parse(fs.readFileSync(CALIBRATION_FILE, 'utf8'));
+  } else {
+    calibrationSettings = {
+      nearThreshold: -65,
+      farThreshold: -85,
+      pathLossExponent: 2.5,
+      txPowerCalibration: -59
+    };
+    fs.writeFileSync(CALIBRATION_FILE, JSON.stringify(calibrationSettings, null, 2));
+  }
+} catch (error) {
+  console.error("Error loading calibration settings:", error);
+}
+
+// 4. Credentials
+const CREDENTIALS_FILE = path.join(__dirname, 'credentials.json');
+let credentials = {};
+
+try {
+  if (fs.existsSync(CREDENTIALS_FILE)) {
+    credentials = JSON.parse(fs.readFileSync(CREDENTIALS_FILE, 'utf8'));
+  } else {
+    credentials = {
+      admin: { username: 'admin123', password: '123' },
+      superadmin: { username: 'superadmin', password: 'super123' }
+    };
+    fs.writeFileSync(CREDENTIALS_FILE, JSON.stringify(credentials, null, 2));
+  }
+} catch (error) {
+  console.error("Error loading credentials:", error);
+}
+
+// 5. Live Status Tracking
 // Keeps track of what equipment we've seen recently.
 // Key = Asset ID (e.g. EQ-2024-001)
 const activeEquipment = {};
+
+// Helper to classify zone based on RSSI and calibration thresholds
+function classifyZone(rssi) {
+  if (rssi == null) return 'Unknown';
+  if (rssi >= calibrationSettings.nearThreshold) return 'Near';
+  if (rssi >= calibrationSettings.farThreshold) return 'Mid';
+  return 'Far';
+}
 
 // Helper to calculate "time ago" string
 function getTimeAgo(date) {
@@ -60,7 +118,7 @@ function getTimeAgo(date) {
 
 // Endpoint: Flutter App POSTs here when it scans an ESP32
 app.post('/api/scan', (req, res) => {
-  const { major, rssi, mac, location, bssid } = req.body;
+  const { major, rssi, mac, location, bssid, distance } = req.body;
   const clientIp = req.ip || req.connection.remoteAddress;
 
   // Determine location based on BSSID
@@ -88,6 +146,7 @@ app.post('/api/scan', (req, res) => {
     activeEquipment[mappedEquipment.id] = {
       ...mappedEquipment,
       rssi: rssi,
+      distance: distance,
       lastSeenDate: new Date(),
       status: 'Active',
       location: finalLocation
@@ -118,17 +177,25 @@ app.get('/api/equipment', (req, res) => {
       const status = secondsSinceSeen > 60 ? 'Inactive' : 'Active';
 
       results.push({
+        major: majorKey,
         ...baseInfo,
         status: status,
         location: liveData.location,
+        distance: liveData.distance,
+        rssi: liveData.rssi,
+        zone: classifyZone(liveData.rssi),
         lastSeen: getTimeAgo(liveData.lastSeenDate)
       });
     } else {
       // It has NEVER been scanned yet
       results.push({
+        major: majorKey,
         ...baseInfo,
         status: 'Inactive',
         location: 'Unknown',
+        distance: null,
+        rssi: null,
+        zone: 'Unknown',
         lastSeen: 'Never'
       });
     }
@@ -171,6 +238,166 @@ app.delete('/api/locations/:bssid', (req, res) => {
   res.json({ success: true, locationMap });
 });
 
+// Endpoint: Get Raw Equipment Map (for Beacon Management UI)
+app.get('/api/equipment/map', (req, res) => {
+  res.json(equipmentMap);
+});
+
+// Endpoint: Adding or Updating Equipment Map
+app.post('/api/equipment', (req, res) => {
+  const { major, id, name, beaconId, category } = req.body;
+  
+  if (!major || !id) {
+    return res.status(400).json({ error: "Missing major or id in payload" });
+  }
+  
+  equipmentMap[major] = { id, name: name || 'Unknown', beaconId: beaconId || '', category: category || 'General' };
+  
+  try {
+    fs.writeFileSync(EQUIPMENT_FILE, JSON.stringify(equipmentMap, null, 2));
+  } catch (error) {
+    console.error("Error saving equipment map:", error);
+  }
+  res.json({ success: true, equipmentMap });
+});
+
+// Endpoint: Deleting Equipment Map
+app.delete('/api/equipment/:major', (req, res) => {
+  const major = req.params.major;
+  if (equipmentMap[major]) {
+    const eqId = equipmentMap[major].id;
+    if (activeEquipment[eqId]) {
+      delete activeEquipment[eqId];
+    }
+    delete equipmentMap[major];
+    
+    try {
+      fs.writeFileSync(EQUIPMENT_FILE, JSON.stringify(equipmentMap, null, 2));
+    } catch (error) {
+      console.error("Error saving equipment map:", error);
+    }
+  }
+  res.json({ success: true, equipmentMap });
+});
+
+// Endpoint: Get Calibration Settings
+app.get('/api/calibration', (req, res) => {
+  res.json(calibrationSettings);
+});
+
+// Endpoint: Update Calibration Settings
+app.post('/api/calibration', (req, res) => {
+  const { nearThreshold, farThreshold, pathLossExponent, txPowerCalibration } = req.body;
+
+  if (nearThreshold != null) calibrationSettings.nearThreshold = Number(nearThreshold);
+  if (farThreshold != null) calibrationSettings.farThreshold = Number(farThreshold);
+  if (pathLossExponent != null) calibrationSettings.pathLossExponent = Number(pathLossExponent);
+  if (txPowerCalibration != null) calibrationSettings.txPowerCalibration = Number(txPowerCalibration);
+
+  try {
+    fs.writeFileSync(CALIBRATION_FILE, JSON.stringify(calibrationSettings, null, 2));
+    console.log(`[Calibration] Updated: Near=${calibrationSettings.nearThreshold}, Far=${calibrationSettings.farThreshold}, N=${calibrationSettings.pathLossExponent}, TxCal=${calibrationSettings.txPowerCalibration}`);
+  } catch (error) {
+    console.error("Error saving calibration settings:", error);
+  }
+  res.json({ success: true, calibration: calibrationSettings });
+});
+
+// Endpoint: Verify Credentials (role-based login)
+app.post('/api/credentials/verify', (req, res) => {
+  const { username, password, role } = req.body;
+
+  if (!role || !credentials[role]) {
+    return res.status(400).json({ success: false, error: 'Invalid role' });
+  }
+
+  const cred = credentials[role];
+  if (username === cred.username && password === cred.password) {
+    res.json({ success: true, role });
+  } else {
+    res.status(401).json({ success: false, error: 'Invalid credentials' });
+  }
+});
+
+// Endpoint: Update Credentials (superadmin only)
+app.post('/api/credentials/update', (req, res) => {
+  const { currentPassword, role, newUsername, newPassword } = req.body;
+
+  // Verify caller is superadmin
+  if (currentPassword !== credentials.superadmin.password) {
+    return res.status(403).json({ success: false, error: 'Superadmin password required' });
+  }
+
+  if (!role || !credentials[role]) {
+    return res.status(400).json({ success: false, error: 'Invalid role' });
+  }
+
+  if (newUsername) credentials[role].username = newUsername;
+  if (newPassword) credentials[role].password = newPassword;
+
+  try {
+    fs.writeFileSync(CREDENTIALS_FILE, JSON.stringify(credentials, null, 2));
+    console.log(`[Credentials] Updated ${role} credentials`);
+  } catch (error) {
+    console.error("Error saving credentials:", error);
+  }
+  res.json({ success: true });
+});
+
+// Endpoint: Factory Reset (clear equipment, locations, calibration)
+app.post('/api/system/reset', (req, res) => {
+  const { password } = req.body;
+
+  if (password !== credentials.superadmin.password) {
+    return res.status(403).json({ success: false, error: 'Superadmin password required' });
+  }
+
+  // Reset equipment map to empty
+  for (const key in equipmentMap) delete equipmentMap[key];
+  fs.writeFileSync(EQUIPMENT_FILE, JSON.stringify(equipmentMap, null, 2));
+
+  // Reset location map to empty
+  for (const key in locationMap) delete locationMap[key];
+  fs.writeFileSync(LOCATION_FILE, JSON.stringify(locationMap, null, 2));
+
+  // Reset calibration to defaults
+  calibrationSettings.nearThreshold = -65;
+  calibrationSettings.farThreshold = -85;
+  calibrationSettings.pathLossExponent = 2.5;
+  calibrationSettings.txPowerCalibration = -59;
+  fs.writeFileSync(CALIBRATION_FILE, JSON.stringify(calibrationSettings, null, 2));
+
+  // Clear active tracking
+  for (const key in activeEquipment) delete activeEquipment[key];
+
+  console.log('[System] Factory reset performed');
+  res.json({ success: true, message: 'Factory reset complete' });
+});
+
+// Endpoint: Clear History Logs (only clears active tracking data)
+app.post('/api/system/clear-logs', (req, res) => {
+  const { password } = req.body;
+
+  if (password !== credentials.superadmin.password) {
+    return res.status(403).json({ success: false, error: 'Superadmin password required' });
+  }
+
+  for (const key in activeEquipment) delete activeEquipment[key];
+
+  console.log('[System] History logs cleared');
+  res.json({ success: true, message: 'History logs cleared' });
+});
+
+// Catch-all: serve the React app for any non-API route (SPA client-side routing)
+app.get(/.*/, (req, res) => {
+  const indexPath = path.join(__dirname, 'public', 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(200).send('Hospital Asset Server is running. Dashboard not built yet — run: npm run build');
+  }
+});
+
 // ── Server Initialize ────────────────────────────────────────────────────────
 
 const os = require('os');
@@ -189,7 +416,8 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n=================================`);
   console.log(`🏥 Hospital Asset Server Running!`);
   console.log(`---------------------------------`);
-  console.log(`Available on your network at:`);
-  addresses.forEach(addr => console.log(`👉 http://${addr}:${PORT}`));
+  console.log(`   Port: ${PORT}`);
+  console.log(`   Local: http://localhost:${PORT}`);
+  addresses.forEach(addr => console.log(`   Network: http://${addr}:${PORT}`));
   console.log(`=================================\n`);
 });

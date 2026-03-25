@@ -81,7 +81,10 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    _requestPermissionsAndScan();
+    // Load saved server URL, then start scanning
+    _scanner.loadServerUrl().then((_) {
+      _requestPermissionsAndScan();
+    });
   }
 
   @override
@@ -216,6 +219,77 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
     }
   }
 
+  void _showServerUrlDialog() {
+    final controller = TextEditingController(text: _scanner.serverUrl);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.dns, color: Color(0xFF00C853), size: 24),
+            SizedBox(width: 8),
+            Text('Server URL', style: TextStyle(fontSize: 18)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Enter the URL of your Hospital Asset Server. This enables the app to sync with the dashboard from any network.',
+              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                labelText: 'Server URL',
+                hintText: 'https://your-app.onrender.com',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                prefixIcon: const Icon(Icons.link),
+              ),
+              keyboardType: TextInputType.url,
+              autocorrect: false,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Examples:\n• Local: http://192.168.1.100:3000\n• Cloud: https://hospital-app.onrender.com',
+              style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            icon: const Icon(Icons.save, size: 18),
+            label: const Text('Save'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF00C853),
+            ),
+            onPressed: () async {
+              final url = controller.text.trim();
+              if (url.isEmpty) return;
+              await _scanner.setServerUrl(url);
+              if (mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('✅ Server URL updated to: $url'),
+                    backgroundColor: const Color(0xFF00C853),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showBeaconDetails(BeaconDevice beacon) {
     showModalBottomSheet(
       context: context,
@@ -260,6 +334,7 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
               ),
               const SizedBox(height: 24),
               _buildDetailRow('RSSI', '${beacon.rssi} dBm'),
+              _buildDetailRow('Zone', BeaconDevice.classifyZone(beacon.rssi, nearThreshold: _scanner.nearThreshold, farThreshold: _scanner.farThreshold)),
               if (beacon.txPower != null)
                 _buildDetailRow('Tx Power', '${beacon.txPower} dBm'),
               if (beacon.distance != null)
@@ -383,14 +458,32 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const SizedBox(),
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.grey[100],
-                      ),
-                      child: Icon(Icons.bluetooth, color: Colors.grey[800]),
+                    Row(
+                      children: [
+                        // Server Settings button
+                        GestureDetector(
+                          onTap: _showServerUrlDialog,
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.grey[100],
+                            ),
+                            child: Icon(Icons.settings, color: Colors.grey[800], size: 20),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.grey[100],
+                          ),
+                          child: Icon(Icons.bluetooth, color: Colors.grey[800]),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -652,6 +745,8 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
                       padding: EdgeInsets.only(top: i == 0 ? 0 : 10),
                       child: _BeaconCard(
                         beacon: displayBeacons[i],
+                        nearThreshold: _scanner.nearThreshold,
+                        farThreshold: _scanner.farThreshold,
                         onTap: () => _showBeaconDetails(displayBeacons[i]),
                       ),
                     );
@@ -735,8 +830,10 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
 
 class _BeaconCard extends StatelessWidget {
   final BeaconDevice beacon;
+  final int nearThreshold;
+  final int farThreshold;
   final VoidCallback? onTap;
-  const _BeaconCard({required this.beacon, this.onTap});
+  const _BeaconCard({required this.beacon, this.nearThreshold = -65, this.farThreshold = -85, this.onTap});
 
   Color get _signalColor {
     final q = beacon.signalQuality;
@@ -830,6 +927,8 @@ class _BeaconCard extends StatelessWidget {
                         ),
                       ),
                     ),
+                    const SizedBox(width: 6),
+                    _ZoneBadge(zone: BeaconDevice.classifyZone(beacon.rssi, nearThreshold: nearThreshold, farThreshold: farThreshold)),
                     const SizedBox(width: 8),
                     Icon(
                       Icons.chevron_right,
@@ -918,3 +1017,46 @@ class _BeaconCard extends StatelessWidget {
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Zone badge widget
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ZoneBadge extends StatelessWidget {
+  final String zone;
+  const _ZoneBadge({required this.zone});
+
+  Color get _color {
+    switch (zone) {
+      case 'Near':
+        return const Color(0xFF00C853);
+      case 'Mid':
+        return const Color(0xFFFFA000);
+      case 'Far':
+        return Colors.redAccent;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: _color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        zone,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: _color,
+        ),
+      ),
+    );
+  }
+}
+

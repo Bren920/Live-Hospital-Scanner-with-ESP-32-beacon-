@@ -48,3 +48,11 @@ app.*.map.json
 node_modules/
 .env
 dist/
+
+# Server-specific build and data
+server/public/
+server/credentials.json
+server/calibration.json
+server/equipmentMap.json
+server/locationMap.json
+server/package-lock.json

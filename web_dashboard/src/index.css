@@ -286,6 +286,36 @@ tr:last-child td {
   border: 1px solid #e2e8f0;
 }
 
+/* Zone Badges */
+.zone-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.zone-near {
+  background-color: var(--success-bg);
+  color: var(--success-text);
+  border: 1px solid #bbf7d0;
+}
+.zone-mid {
+  background-color: var(--warning-bg);
+  color: var(--warning-text);
+  border: 1px solid #fde68a;
+}
+.zone-far {
+  background-color: var(--danger-bg);
+  color: var(--danger-text);
+  border: 1px solid #fecaca;
+}
+.zone-unknown {
+  background-color: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
 /* Admin Settings Sub-sections */
 .settings-grid {
   display: flex;
@@ -522,4 +552,38 @@ input[type=range] {
 }
 .auth-btn:hover {
   background-color: var(--primary-hover);
+}
+
+/* Superadmin Styles */
+.superadmin-nav {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.superadmin-nav.active {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+}
+
+.superadmin-auth-icon {
+  background-color: #f3e8ff;
+  color: #7c3aed;
+}
+
+.superadmin-modal h2 {
+  color: #4c1d95;
+}
+
+.superadmin-auth-btn {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+}
+.superadmin-auth-btn:hover {
+  background: linear-gradient(135deg, #6d28d9, #5b21b6);
+}
+
+select {
+  cursor: pointer;
+}
+select:focus {
+  border-color: var(--primary-blue);
 }
