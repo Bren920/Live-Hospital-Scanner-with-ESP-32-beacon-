@@ -696,18 +696,7 @@ const SuperadminView = ({ isUnlocked, setIsUnlocked, liveData }) => {
             </form>
           </div>
 
-          {/* Danger Zone */}
-          <div className="settings-card danger-zone">
-             <div className="settings-card-header">
-                <AlertTriangle size={20} /> System Maintenance
-             </div>
-             <div className="danger-text">
-               <strong>Danger Zone</strong><br/>
-               These actions cannot be undone. Please proceed with caution.
-             </div>
-             <button className="btn-danger-outline" onClick={handleClearLogs}><AlertTriangle size={16} style={{marginRight: '8px'}} /> Clear History Logs</button>
-             <button className="btn-danger-solid" onClick={handleFactoryReset}><AlertTriangle size={16} style={{marginRight: '8px'}} /> Factory Reset</button>
-          </div>
+
 
         </div>
       </div>
