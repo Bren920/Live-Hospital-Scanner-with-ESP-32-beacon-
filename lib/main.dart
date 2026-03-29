@@ -8,6 +8,7 @@ import 'package:flutter_background_service_android/flutter_background_service_an
 
 import 'beacon_model.dart';
 import 'beacon_scanner_service.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
