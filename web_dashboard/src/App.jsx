@@ -649,11 +649,12 @@ const SuperadminView = ({ isUnlocked, setIsUnlocked, liveData }) => {
                   <div style={{ color: '#94a3b8', fontSize: '0.8rem', padding: '16px 0' }}>No active beacons to display</div>
                 ) : (
                   liveData.filter(d => d.rssi != null).map((d, i) => {
-                    const pct = Math.max(0, Math.min(100, ((d.rssi + 100) / 70) * 100));
+                    // Ensure a minimum height of 5% so the bar is always visible
+                    const pct = Math.max(5, Math.min(100, ((d.rssi + 100) / 70) * 100));
                     const color = d.rssi >= nearThreshold ? '#22c55e' : d.rssi >= farThreshold ? '#f59e0b' : '#ef4444';
                     return (
-                      <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
-                        <div className="signal-bar" style={{ height: `${pct}%`, backgroundColor: color }} title={`${d.name}: ${d.rssi} dBm`}></div>
+                      <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, height: '100%', justifyContent: 'flex-end' }}>
+                        <div className="signal-bar" style={{ height: `${pct}%`, width: '100%', backgroundColor: color }} title={`${d.name}: ${d.rssi} dBm`}></div>
                         <div style={{ fontSize: '0.6rem', color: '#64748b', marginTop: '4px', textAlign: 'center', maxWidth: '50px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name?.split(' ')[0] || d.id}</div>
                       </div>
                     );

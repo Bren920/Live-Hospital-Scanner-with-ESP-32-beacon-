@@ -79,12 +79,8 @@ class BeaconDevice {
     if (effectiveTxPower == null) return -1.0;
     if (rssi == 0) return -1.0;
 
-    final ratio = rssi * 1.0 / effectiveTxPower;
-    if (ratio < 1.0) {
-      return pow(ratio, 10).toDouble();
-    } else {
-      return (0.89976) * pow(ratio, 7.7095 * (pathLossExponent / 2.0)) + 0.111;
-    }
+    // Log-distance path loss model formula: Distance = 10 ^ ((TxPower - RSSI) / (10 * PathLossExponent))
+    return pow(10, (effectiveTxPower - rssi) / (10.0 * pathLossExponent)).toDouble();
   }
 
   /// Classify the zone based on RSSI thresholds

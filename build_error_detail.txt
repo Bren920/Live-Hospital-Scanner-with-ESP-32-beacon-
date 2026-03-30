@@ -1,0 +1,50 @@
+﻿[        ] Compiling XML table D:\FYP\hospital_scanner\build\shared_preferences_android\intermediates\merged_res\release\mergeReleaseResources\values-v24\values-v24.xml to D:\FYP\hospital_scanner\build\shared_preferences_android\intermediates\verified_library_resources\release\verifyReleaseResources\compiled\values-v24_values-v24.arsc.flat
+[        ] Compiling XML table D:\FYP\hospital_scanner\build\shared_preferences_android\intermediates\merged_res\release\mergeReleaseResources\values-fr\values-fr.xml to D:\FYP\hospital_scanner\build\shared_preferences_android\intermediates\verified_library_resources\release\verifyReleaseResources\compiled\values-fr_values-fr.arsc.flat
+[        ] Compiling XML table D:\FYP\hospital_scanner\build\shared_preferences_android\intermediates\merged_res\release\mergeReleaseResources\values-it\values-it.xml to D:\FYP\hospital_scanner\build\shared_preferences_android\intermediates\verified_library_resources\release\verifyReleaseResources\compiled\values-it_values-it.arsc.flat
+[        ] Compiling XML table D:\FYP\hospital_scanner\build\shared_preferences_android\intermediates\merged_res\release\mergeReleaseResources\values-lo\values-lo.xml to D:\FYP\hospital_scanner\build\shared_preferences_android\intermediates\verified_library_resources\release\verifyReleaseResources\compiled\values-lo_values-lo.arsc.flat
+[        ] Compiling XML table D:\FYP\hospital_scanner\build\shared_preferences_android\intermediates\merged_res\release\mergeReleaseResources\values-nl\values-nl.xml to D:\FYP\hospital_scanner\build\shared_preferences_android\intermediates\verified_library_resources\release\verifyReleaseResources\compiled\values-nl_values-nl.arsc.flat
+[        ] Compiling XML table D:\FYP\hospital_scanner\build\shared_preferences_android\intermediates\merged_res\release\mergeReleaseResources\values-sl\values-sl.xml to D:\FYP\hospital_scanner\build\shared_preferences_android\intermediates\verified_library_resources\release\verifyReleaseResources\compiled\values-sl_values-sl.arsc.flat
+[        ] Compiling XML table D:\FYP\hospital_scanner\build\shared_preferences_android\intermediates\merged_res\release\mergeReleaseResources\values-uk\values-uk.xml to D:\FYP\hospital_scanner\build\shared_preferences_android\intermediates\verified_library_resources\release\verifyReleaseResources\compiled\values-uk_values-uk.arsc.flat
+[   +1 ms] Compiling XML table D:\FYP\hospital_scanner\build\shared_preferences_android\intermediates\merged_res\release\mergeReleaseResources\values-v28\values-v28.xml to D:\FYP\hospital_scanner\build\shared_preferences_android\intermediates\verified_library_resources\release\verifyReleaseResources\compiled\values-v28_values-v28.arsc.flat
+[   +2 ms] Resolve mutations for :app:createReleaseApkListingFileRedirect (Thread[#95,Execution worker Thread 3,5,main]) started.
+[        ] :app:createReleaseApkListingFileRedirect (Thread[#95,Execution worker Thread 3,5,main]) started.
+[  +72 ms] > Task :app:createReleaseApkListingFileRedirect
+[        ] Caching disabled for task ':app:createReleaseApkListingFileRedirect' because:
+[        ]   Build cache is disabled
+[        ]   Caching has been disabled for the task
+[        ] Task ':app:createReleaseApkListingFileRedirect' is not up-to-date because:
+[        ]   Output property 'redirectFile' file D:\FYP\hospital_scanner\build\app\intermediates\apk_ide_redirect_file\release\createReleaseApkListingFileRedirect\redirect.txt has been removed.
+[        ] Resolve mutations for :app:assembleRelease (Thread[#95,Execution worker Thread 3,5,main]) started.
+[        ] :app:assembleRelease (Thread[#95,Execution worker Thread 3,5,main]) started.
+[        ] > Task :app:assembleRelease
+[        ] Caching disabled for task ':app:assembleRelease' because:
+[        ]   Build cache is disabled
+[        ] Task ':app:assembleRelease' is not up-to-date because:
+[        ]   Task has not declared any outputs despite executing actions.
+[+7392 ms] Resolve mutations for :shared_preferences_android:assembleRelease (Thread[#100,Execution worker Thread 8,5,main]) started.
+[  +93 ms] :shared_preferences_android:assembleRelease (Thread[#100,Execution worker Thread 8,5,main]) started.
+[        ] > Task :shared_preferences_android:assembleRelease
+[        ] Skipping task ':shared_preferences_android:assembleRelease' as it has no actions.
+[ +497 ms] w: Detected multiple Kotlin daemon sessions at 
+[        ] AAPT2 aapt2-8.11.1-12782657-windows Daemon #0: shutdown
+[        ] AAPT2 aapt2-8.11.1-12782657-windows Daemon #1: shutdown
+[        ] AAPT2 aapt2-8.11.1-12782657-windows Daemon #2: shutdown
+[        ] AAPT2 aapt2-8.11.1-12782657-windows Daemon #3: shutdown
+[        ] AAPT2 aapt2-8.11.1-12782657-windows Daemon #4: shutdown
+[        ] AAPT2 aapt2-8.11.1-12782657-windows Daemon #5: shutdown
+[        ] Android Lint: Disposing Uast application environment in lint classloaders [31.11.1_false, 31.11.1_true]
+[ +110 ms] Build 7aa862d3-2124-435e-b257-d8c7d110c2ab is closed
+[  +93 ms] [Incubating] Problems report is available at: file:///D:/FYP/hospital_scanner/build/reports/problems/problems-report.html
+[        ] Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+[        ] You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+[        ] For more on this, please refer to https://docs.gradle.org/8.14/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+[        ] BUILD SUCCESSFUL in 3m
+[        ] 260 actionable tasks: 128 executed, 132 up-to-date
+[ +204 ms] Watched directory hierarchies: [D:\flutter\packages\flutter_tools\gradle, D:\FYP\hospital_scanner\android]
+[ +834 ms] Running Gradle task 'assembleRelease'... (completed in 181.2s)
+[  +93 ms] Calculate SHA1: LocalDirectory: 'D:\FYP\hospital_scanner\build\app\outputs\flutter-apk'/app-release.apk
+[ +739 ms] ΓêÜ Built build\app\outputs\flutter-apk\app-release.apk (50.8MB)
+[  +40 ms] "flutter apk" took 183,884ms.
+[ +174 ms] Running 1 shutdown hook
+[   +3 ms] Shutdown hooks complete
+[ +238 ms] exiting with code 0

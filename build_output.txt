@@ -1,0 +1,51 @@
+﻿Resolving dependencies...
+Downloading packages...
+  async 2.13.0 (2.13.1 available)
+  cupertino_icons 1.0.8 (1.0.9 available)
+  flutter_blue_plus 2.1.1 (2.2.1 available)
+  flutter_blue_plus_android 8.1.0 (8.2.1 available)
+  flutter_blue_plus_darwin 8.1.1 (8.2.1 available)
+  flutter_blue_plus_linux 8.1.0 (8.2.1 available)
+  flutter_blue_plus_platform_interface 8.1.0 (8.2.1 available)
+  flutter_blue_plus_web 8.1.0 (8.2.1 available)
+  matcher 0.12.18 (0.12.19 available)
+  meta 1.17.0 (1.18.2 available)
+  network_info_plus 6.1.4 (7.0.0 available)
+  shared_preferences 2.5.4 (2.5.5 available)
+  shared_preferences_android 2.4.20 (2.4.23 available)
+  shared_preferences_platform_interface 2.4.1 (2.4.2 available)
+  test_api 0.7.9 (0.7.11 available)
+  vector_math 2.2.0 (2.3.0 available)
+  win32 5.15.0 (6.0.0 available)
+Got dependencies!
+17 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+Running Gradle task 'assembleRelease'...                        
+flutter : 
+At line:1 char:1
++ flutter build apk --release 2>&1 | Out-File 
+-FilePath "d:\FYP\hospita ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) 
+    [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task 
+':app:cleanMergeReleaseAssets'.
+> java.io.IOException: Unable to delete directory 'D:\
+FYP\hospital_scanner\build\app\intermediates\assets\re
+lease\mergeReleaseAssets'
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log 
+output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 27s
+Running Gradle task 'assembleRelease'...                           28.4s
+Gradle task assembleRelease failed with exit code 1
