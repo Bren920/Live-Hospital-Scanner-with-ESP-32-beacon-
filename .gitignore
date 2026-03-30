@@ -65,3 +65,8 @@ server/package-lock.json
 # Local APK build artifacts
 /apks/
 /releases/
+
+# Signing keys (NEVER commit these)
+*.jks
+*.keystore
+android/key.properties
