@@ -42,14 +42,14 @@ const DashboardView = ({ liveData }) => (
       </div>
       <div className="metric-card">
         <div className="metric-info">
-          <h3>Active Beacons</h3>
+          <h3>Scanned Equipment</h3>
           <div className="value">{liveData.filter(e => e.status === 'Active').length}</div>
         </div>
         <div className="metric-icon green"><Radio /></div>
       </div>
       <div className="metric-card">
         <div className="metric-info">
-          <h3>Missing Items</h3>
+          <h3>Missed Equipment</h3>
           <div className="value">{liveData.filter(e => e.status === 'Inactive').length}</div>
         </div>
         <div className="metric-icon red"><AlertTriangle /></div>
@@ -68,26 +68,18 @@ const DashboardView = ({ liveData }) => (
             <th>Asset ID</th>
             <th>Name</th>
             <th>Current Location (Ward)</th>
-            <th>Est. Distance</th>
-            <th>Zone</th>
             <th>Last Seen</th>
           </tr>
         </thead>
         <tbody>
           {liveData.length === 0 ? (
-            <tr><td colSpan="6" style={{textAlign:'center', padding: '32px'}}>Scanning for assets...</td></tr>
+            <tr><td colSpan="4" style={{ textAlign: 'center', padding: '32px' }}>Scanning for assets...</td></tr>
           ) : (
-             liveData.map((eq) => (
+            liveData.map((eq) => (
               <tr key={eq.id}>
                 <td>{eq.id}</td>
                 <td style={{ fontWeight: 500, color: '#1e293b' }}>{eq.name}</td>
                 <td>{eq.location || 'Unknown'}</td>
-                <td>{eq.distance != null ? `${Number(eq.distance).toFixed(2)}m` : 'N/A'}</td>
-                <td>
-                  <span className={`zone-pill zone-${(eq.zone || 'unknown').toLowerCase()}`}>
-                    {eq.zone || 'Unknown'}
-                  </span>
-                </td>
                 <td>{eq.lastSeen || 'Never'}</td>
               </tr>
             ))
@@ -119,9 +111,9 @@ const EquipmentView = ({ liveData }) => (
         </thead>
         <tbody>
           {liveData.length === 0 ? (
-             <tr><td colSpan="5" style={{textAlign:'center'}}>No equipment data loaded</td></tr>
+            <tr><td colSpan="5" style={{ textAlign: 'center' }}>No equipment data loaded</td></tr>
           ) : (
-             liveData.map((eq) => (
+            liveData.map((eq) => (
               <tr key={eq.id}>
                 <td>{eq.id}</td>
                 <td style={{ fontWeight: 500, color: '#1e293b' }}>{eq.name}</td>
@@ -129,7 +121,7 @@ const EquipmentView = ({ liveData }) => (
                 <td>{eq.beaconId}</td>
                 <td>{eq.category}</td>
                 <td>
-                  <span className={`status-pill status-${(eq.status||'inactive').toLowerCase()}`}>
+                  <span className={`status-pill status-${(eq.status || 'inactive').toLowerCase()}`}>
                     {eq.status || 'Inactive'}
                   </span>
                 </td>
@@ -294,13 +286,13 @@ const SettingsView = ({ isUnlocked, setIsUnlocked, liveData }) => {
 
       <div className="content-area" style={{ filter: !isUnlocked ? 'blur(4px)' : 'none', pointerEvents: !isUnlocked ? 'none' : 'auto' }}>
         <div className="settings-grid">
-          
+
           {/* BSSID & Location Config */}
           <div className="settings-card">
             <div className="settings-card-header" style={{ marginBottom: '16px' }}>
               <Wifi size={20} className="blue" /> BSSID & Physical Location Config
             </div>
-            
+
             <form onSubmit={addLocation} style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
               <div className="input-group" style={{ flex: 1, marginBottom: 0 }}>
                 <input type="text" placeholder="WiFi BSSID (e.g., 00:11:22...)" value={newBssid} onChange={e => setNewBssid(e.target.value)} required />
@@ -336,27 +328,27 @@ const SettingsView = ({ isUnlocked, setIsUnlocked, liveData }) => {
           <div className="settings-card">
             <div className="settings-card-header" style={{ justifyContent: 'space-between', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Radio size={20} className="blue" /> Beacon Management
+                <Radio size={20} className="blue" /> Equipment Management
               </div>
-              <button 
-                className={`btn ${showAddBeacon ? 'btn-danger-outline' : 'btn-primary'}`} 
+              <button
+                className={`btn ${showAddBeacon ? 'btn-danger-outline' : 'btn-primary'}`}
                 onClick={() => setShowAddBeacon(!showAddBeacon)}
                 style={{ padding: '6px 12px', width: 'auto' }}
               >
-                {showAddBeacon ? 'Cancel' : '+ Add Beacon'}
+                {showAddBeacon ? 'Cancel' : '+ Add Equipment'}
               </button>
             </div>
 
             {showAddBeacon && (
               <form onSubmit={handleAddBeacon} style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <input type="text" placeholder="Major Value (e.g. 200)" value={newBeacon.major} onChange={e => setNewBeacon({...newBeacon, major: e.target.value})} required style={{ flex: 1, padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}/>
-                  <input type="text" placeholder="Designated Asset ID (e.g. EQ-105)" value={newBeacon.id} onChange={e => setNewBeacon({...newBeacon, id: e.target.value})} required style={{ flex: 1, padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}/>
+                  <input type="text" placeholder="Major Value (e.g. 200)" value={newBeacon.major} onChange={e => setNewBeacon({ ...newBeacon, major: e.target.value })} required style={{ flex: 1, padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }} />
+                  <input type="text" placeholder="Designated Asset ID (e.g. EQ-105)" value={newBeacon.id} onChange={e => setNewBeacon({ ...newBeacon, id: e.target.value })} required style={{ flex: 1, padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }} />
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <input type="text" placeholder="Asset Name" value={newBeacon.name} onChange={e => setNewBeacon({...newBeacon, name: e.target.value})} style={{ flex: 1, padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}/>
-                  <input type="text" placeholder="Category" value={newBeacon.category} onChange={e => setNewBeacon({...newBeacon, category: e.target.value})} style={{ flex: 1, padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}/>
-                  <input type="text" placeholder="Beacon Label" value={newBeacon.beaconId} onChange={e => setNewBeacon({...newBeacon, beaconId: e.target.value})} style={{ flex: 1, padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}/>
+                  <input type="text" placeholder="Asset Name" value={newBeacon.name} onChange={e => setNewBeacon({ ...newBeacon, name: e.target.value })} style={{ flex: 1, padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }} />
+                  <input type="text" placeholder="Category" value={newBeacon.category} onChange={e => setNewBeacon({ ...newBeacon, category: e.target.value })} style={{ flex: 1, padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }} />
+                  <input type="text" placeholder="Beacon Label" value={newBeacon.beaconId} onChange={e => setNewBeacon({ ...newBeacon, beaconId: e.target.value })} style={{ flex: 1, padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }} />
                 </div>
                 <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start' }}>Save Beacon Database</button>
               </form>
@@ -382,13 +374,13 @@ const SettingsView = ({ isUnlocked, setIsUnlocked, liveData }) => {
                         <span>{info.category || 'General'}</span>
                         <span style={{ color: '#94a3b8' }}>|</span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: status === 'Active' ? '#22c55e' : '#cbd5e1', display: 'inline-block' }}></span> 
+                          <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: status === 'Active' ? '#22c55e' : '#cbd5e1', display: 'inline-block' }}></span>
                           {status} — {location}
                         </span>
                       </div>
                     </div>
-                    <button 
-                      onClick={() => deleteBeacon(majorKey)} 
+                    <button
+                      onClick={() => deleteBeacon(majorKey)}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '8px', marginLeft: '12px' }}
                       title={`Delete beacon Major ${majorKey}`}
                     >
@@ -602,7 +594,7 @@ const SuperadminView = ({ isUnlocked, setIsUnlocked, liveData }) => {
             <div className="settings-card-header">
               <Settings size={20} className="blue" /> Signal Calibration
             </div>
-            
+
             <div className="slider-group">
               <div className="slider-group-header">
                 <span>Near Zone Threshold</span>
@@ -747,7 +739,7 @@ function App() {
   return (
     <div className="app-container">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-      
+
       <div className="main-content">
         <div className="top-header">
           <div className="header-title-wrapper">
@@ -759,7 +751,7 @@ function App() {
             <input type="text" placeholder="Search equipment..." />
           </div>
         </div>
-        
+
         {activeTab === 'dashboard' && <DashboardView liveData={liveData} />}
         {activeTab === 'equipment' && <EquipmentView liveData={liveData} />}
         {activeTab === 'settings' && <SettingsView isUnlocked={isAdminUnlocked} setIsUnlocked={setIsAdminUnlocked} liveData={liveData} />}
