@@ -15,6 +15,10 @@ class BeaconDevice {
   final int? txPower;
   final double? distance; // Estimated distance in meters
 
+  // User-friendly fields
+  final String? equipmentName; // e.g. "Portable X-Ray Machine"
+  final String? equipmentCategory; // e.g. "Imaging Equipment"
+
   const BeaconDevice({
     required this.id,
     required this.name,
@@ -26,6 +30,8 @@ class BeaconDevice {
     this.minor,
     this.txPower,
     this.distance,
+    this.equipmentName,
+    this.equipmentCategory,
   });
 
   /// Signal quality as a 0.0–1.0 value based on typical RSSI range [-100, -30].
@@ -45,10 +51,44 @@ class BeaconDevice {
     return 'Weak';
   }
 
+  /// User-friendly proximity guide based on estimated distance.
+  String get proximityGuide {
+    if (distance == null || distance! < 0) return 'Calculating...';
+    final d = distance!;
+    if (d < 0.5) return 'Right next to you!';
+    if (d < 1.0) return 'Very close — look around you';
+    if (d < 3.0) return 'Getting closer, keep moving';
+    if (d < 8.0) return 'Nearby — walk towards the signal';
+    if (d < 15.0) return 'In the area — keep searching';
+    return 'Far away — try another area';
+  }
+
+  /// Friendly display name — equipment name if available, else fallback
+  String get displayName {
+    if (equipmentName != null && equipmentName!.isNotEmpty) {
+      return equipmentName!;
+    }
+    if (name.isNotEmpty && name != 'Unknown Device') {
+      return name;
+    }
+    return 'Unknown Equipment';
+  }
+
+  /// Formatted distance string for display
+  String get distanceText {
+    if (distance == null || distance! < 0) return '—';
+    if (distance! < 1.0) {
+      return '${(distance! * 100).toStringAsFixed(0)} cm';
+    }
+    return '${distance!.toStringAsFixed(1)} m';
+  }
+
   BeaconDevice copyWith({
     int? rssi,
     DateTime? lastSeen,
     double? distance,
+    String? equipmentName,
+    String? equipmentCategory,
   }) {
     return BeaconDevice(
       id: id,
@@ -61,6 +101,8 @@ class BeaconDevice {
       minor: minor,
       txPower: txPower,
       distance: distance ?? this.distance,
+      equipmentName: equipmentName ?? this.equipmentName,
+      equipmentCategory: equipmentCategory ?? this.equipmentCategory,
     );
   }
 

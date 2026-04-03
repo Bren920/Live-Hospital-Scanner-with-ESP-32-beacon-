@@ -10,6 +10,6 @@ void main() {
     await tester.pumpWidget(const HospitalScannerApp());
 
     // Verify the main heading is present.
-    expect(find.text('Equipment Tracker'), findsOneWidget);
+    expect(find.textContaining('Hospital Equipment'), findsOneWidget);
   });
 }

@@ -7,6 +7,7 @@ import 'package:network_info_plus/network_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'beacon_model.dart';
+import 'equipment_map.dart';
 
 /// Service that wraps flutter_blue_plus and exposes a stream of detected beacons.
 class BeaconScannerService {
@@ -30,6 +31,9 @@ class BeaconScannerService {
 
   String get serverUrl => _serverBase;
 
+  // Equipment map service
+  final _equipmentMap = EquipmentMapService.instance;
+
   /// Load the saved server URL from SharedPreferences
   Future<void> loadServerUrl() async {
     final prefs = await SharedPreferences.getInstance();
@@ -48,8 +52,6 @@ class BeaconScannerService {
   }
 
   // Dynamic location set from the UI
-  // We removed the dropdown, but we still need a default.
-  // Instead of 'Dahlia B2 Level 3', let's use 'Unknown Location' so it's obvious when BSSID mapping fails.
   String selectedLocation = 'Unknown Location';
 
   Timer? _uploadTimer;
@@ -89,10 +91,14 @@ class BeaconScannerService {
     // Fetch calibration from server
     await _fetchCalibration();
 
+    // Fetch equipment names from server
+    await _equipmentMap.fetchFromServer(_serverBase);
+
     // Periodically refresh calibration from server (every 30 seconds)
     _calibrationTimer?.cancel();
     _calibrationTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       _fetchCalibration();
+      _equipmentMap.fetchFromServer(_serverBase);
     });
 
     // Start background timer to upload detected beacons to the web dashboard
@@ -115,19 +121,20 @@ class BeaconScannerService {
         final iBeaconData = _extractIBeaconData(
           result.advertisementData.manufacturerData,
         );
-        final isIBeaconPacket = iBeaconData != null;
 
-        // FILTER: Disabled for now to ensure all devices are visible for debugging
-        final isEsp32Name = name.toLowerCase().contains('esp32');
-        final isIBeaconName = name.toLowerCase().contains('ibeacon');
-
-        // Only keep packets that are formatted strictly like an iBeacon/ESP32
-        if (!isEsp32Name && !isIBeaconName && !isIBeaconPacket) {
-          continue; // Throw away Bluetooth traffic from random laptops/tvs
+        // STRICT FILTER: Only keep devices with valid iBeacon data
+        // This removes all random Bluetooth devices (headphones, laptops, TVs, etc.)
+        if (iBeaconData == null) {
+          continue;
         }
 
         // Build raw data hex string from manufacturer data
         final rawData = _buildRawDataString(result.advertisementData);
+
+        // Get equipment name from the map
+        final major = iBeaconData['major'] as int?;
+        final equipmentName = _equipmentMap.getEquipmentName(major);
+        final equipmentCategory = _equipmentMap.getCategory(major);
 
         final beacon = BeaconDevice(
           id: id,
@@ -135,16 +142,18 @@ class BeaconScannerService {
           rssi: result.rssi,
           lastSeen: DateTime.now(),
           rawData: rawData,
-          uuid: iBeaconData?['uuid'],
-          major: iBeaconData?['major'],
-          minor: iBeaconData?['minor'],
-          txPower: iBeaconData?['txPower'],
+          uuid: iBeaconData['uuid'],
+          major: iBeaconData['major'],
+          minor: iBeaconData['minor'],
+          txPower: iBeaconData['txPower'],
           distance: BeaconDevice.calculateDistance(
             result.rssi,
-            iBeaconData?['txPower'],
+            iBeaconData['txPower'],
             pathLossExponent: _pathLossExponent,
             txPowerCalibration: _txPowerCalibration,
           ),
+          equipmentName: equipmentName,
+          equipmentCategory: equipmentCategory,
         );
 
         _beacons[id] = beacon;
@@ -238,7 +247,7 @@ class BeaconScannerService {
   Future<void> _sendLog(String message) async {
     print(
       "🏥 [HOSPITAL SCANNER LOG]: $message",
-    ); // Print locally to Cursor IDE console
+    );
     try {
       await http
           .post(
@@ -264,7 +273,6 @@ class BeaconScannerService {
     String? wifiBSSID;
     try {
       wifiBSSID = await NetworkInfo().getWifiBSSID();
-      // If the app doesn't have precise location permissions or GPS is off, Android returns null or "02:00:00:00:00:00"
       if (wifiBSSID != null) {
          print("Successfully fetched BSSID from phone: $wifiBSSID");
       } else {
@@ -278,18 +286,9 @@ class BeaconScannerService {
     final List<Future<void>> uploadTasks = [];
 
     for (final beacon in _beacons.values) {
-      if (beacon.name.toLowerCase().contains("esp32") ||
-          beacon.name.toLowerCase().contains("ibeacon")) {
-        // Print locally instead of sending an HTTP log request every 3 seconds to avoid network spam and lag
-        print(
-          "Found ESP32/iBeacon! MAC: ${beacon.id}, Major: ${beacon.major}, Raw Payload: ${beacon.rawData}",
-        );
-      }
-
       if (beacon.major != null) {
         uploadsAttempted++;
         
-        // Add to a list of futures so we don't block the loop with sequential awaits
         uploadTasks.add(() async {
           try {
             await http
@@ -309,8 +308,7 @@ class BeaconScannerService {
                       nearThreshold: _nearThreshold,
                       farThreshold: _farThreshold,
                     ),
-                    'location':
-                        selectedLocation, // Using standard UI selected location fallback
+                    'location': selectedLocation,
                     'bssid': wifiBSSID,
                   }),
                 )
@@ -338,18 +336,13 @@ class BeaconScannerService {
     Map<int, List<int>> manufacturerData,
   ) {
     // 0x004C is Apple's ID, commonly used for iBeacons
-    // Some ESP32 libraries also use this ID or others.
-    // If not found, we can check for other common IDs if needed.
     if (manufacturerData.containsKey(0x004C)) {
       final data = manufacturerData[0x004C]!;
-      // Log the payload so we can see what the ESP32 is actually sending
       _sendLog(
         "0x004C payload length: ${data.length}, data: [${data.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}]",
       );
 
-      // Often ESP32s send 21 bytes (stripped 0x02 0x15 headers) or 23 bytes (full)
       if (data.length >= 21) {
-        // Assume if it's 21, the headers are stripped. If 23, they are present.
         int offset = (data[0] == 0x02 && data[1] == 0x15) ? 2 : 0;
 
         final uuidBytes = data.sublist(offset, offset + 16);

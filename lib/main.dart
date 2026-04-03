@@ -8,6 +8,7 @@ import 'package:flutter_background_service_android/flutter_background_service_an
 
 import 'beacon_model.dart';
 import 'beacon_scanner_service.dart';
+import 'equipment_map.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 Future<void> main() async {
@@ -88,11 +89,14 @@ class HospitalScannerApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Hospital Scanner',
+      title: 'Hospital Equipment Tracker',
       theme: ThemeData(
         useMaterial3: true,
-        scaffoldBackgroundColor: Colors.white,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00C853)),
+        scaffoldBackgroundColor: const Color(0xFFF5F7FA),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF00C853),
+          surface: const Color(0xFFF5F7FA),
+        ),
         fontFamily: 'Roboto',
       ),
       home: const EquipmentTrackerScreen(),
@@ -114,11 +118,16 @@ class EquipmentTrackerScreen extends StatefulWidget {
 class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
     with SingleTickerProviderStateMixin {
   final _scanner = BeaconScannerService.instance;
+  final _equipmentMap = EquipmentMapService.instance;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   List<BeaconDevice> _beacons = [];
   bool _isScanning = false;
   String _statusMessage = 'Ready to scan';
-  DateTime? _lastUpdated;
+
+  // Equipment filter (null = show all)
+  int? _selectedMajorFilter;
+  String? _selectedEquipmentName;
 
   // Pulse animation for the scanning indicator
   late AnimationController _pulseController;
@@ -160,16 +169,14 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
     try {
       setState(() => _statusMessage = 'Requesting permissions…');
 
-      // Request Bluetooth + location permissions
       Map<Permission, PermissionStatus> statuses = await [
         Permission.bluetooth,
         Permission.bluetoothScan,
         Permission.bluetoothConnect,
         Permission.locationWhenInUse,
-        Permission.locationAlways, // Some devices need this for background BLE
+        Permission.locationAlways,
       ].request();
 
-      // Check if location services are enabled (crucial for some Android devices)
       var locationServiceStatus =
           await Permission.locationWhenInUse.serviceStatus;
       if (locationServiceStatus.isDisabled) {
@@ -177,7 +184,7 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
-                'Please enable Location Services (GPS) for Bluetooth scanning',
+                'Please enable Location Services for equipment scanning',
               ),
               duration: Duration(seconds: 5),
             ),
@@ -185,17 +192,9 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
         }
       }
 
-      final anyDenied = statuses.values.any(
-        (s) =>
-            s == PermissionStatus.denied ||
-            s == PermissionStatus.permanentlyDenied,
-      );
-
-      // We won't block completely if just locationAlways is denied, but we need the others
       final criticalDenied = statuses[Permission.bluetoothScan] == PermissionStatus.denied ||
                              statuses[Permission.bluetoothConnect] == PermissionStatus.denied ||
                              statuses[Permission.locationWhenInUse] == PermissionStatus.denied;
-
 
       if (criticalDenied) {
         setState(() => _statusMessage = 'Permissions denied.');
@@ -222,7 +221,7 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
       builder: (context) => AlertDialog(
         title: const Text('Permissions Required'),
         content: const Text(
-          'This app needs Bluetooth and Location permissions to scan for beacons. Please grant them in settings.',
+          'This app needs Bluetooth and Location permissions to find hospital equipment. Please grant them in settings.',
         ),
         actions: [
           TextButton(
@@ -244,7 +243,7 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
   Future<void> _startScan() async {
     try {
       setState(() {
-        _statusMessage = 'Scanning for beacons (Battery Saving Mode)…';
+        _statusMessage = 'Scanning for equipment…';
         _isScanning = true;
       });
       _pulseController.repeat(reverse: true);
@@ -257,19 +256,16 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
       _uiUpdateTimer?.cancel();
       _uiUpdateTimer = Timer.periodic(const Duration(milliseconds: 500), (_) async {
         if (mounted && _isScanning) {
-          // Check if FlutterBluePlus is actually scanning right now
           final isCurrentlyScanning = await FlutterBluePlus.isScanning.first;
           
           setState(() {
             _beacons = latestBeacons;
-            _lastUpdated = DateTime.now();
             
-            // Update UI to show sleep/wake cycle
             if (isCurrentlyScanning) {
-              _statusMessage = 'Scanning for beacons (Active)…';
+              _statusMessage = 'Scanning for equipment…';
               if (!_pulseController.isAnimating) _pulseController.repeat(reverse: true);
             } else {
-              _statusMessage = 'Sleeping to save battery (10s)…';
+              _statusMessage = 'Saving battery…';
               _pulseController.stop();
             }
           });
@@ -317,7 +313,7 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
           children: [
             Icon(Icons.dns, color: Color(0xFF00C853), size: 24),
             SizedBox(width: 8),
-            Text('Server URL', style: TextStyle(fontSize: 18)),
+            Text('Server Settings', style: TextStyle(fontSize: 18)),
           ],
         ),
         content: Column(
@@ -325,25 +321,20 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Enter the URL of your Hospital Asset Server. This enables the app to sync with the dashboard from any network.',
+              'Enter the server address to sync with the web dashboard.',
               style: TextStyle(fontSize: 13, color: Colors.grey[600]),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: controller,
               decoration: InputDecoration(
-                labelText: 'Server URL',
+                labelText: 'Server Address',
                 hintText: 'https://your-app.onrender.com',
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 prefixIcon: const Icon(Icons.link),
               ),
               keyboardType: TextInputType.url,
               autocorrect: false,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Examples:\n• Local: http://192.168.1.100:3000\n• Cloud: https://hospital-app.onrender.com',
-              style: TextStyle(fontSize: 11, color: Colors.grey[500]),
             ),
           ],
         ),
@@ -366,7 +357,7 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('✅ Server URL updated to: $url'),
+                    content: Text('✅ Server updated to: $url'),
                     backgroundColor: const Color(0xFF00C853),
                     duration: const Duration(seconds: 2),
                   ),
@@ -385,245 +376,342 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
       isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.8,
+        height: MediaQuery.of(context).size.height * 0.55,
         padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Handle bar
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 24),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+
+            // Equipment Icon + Name
+            Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
                   decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
+                    color: _getCategoryColor(beacon.equipmentCategory).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    _getCategoryIcon(beacon.equipmentCategory),
+                    color: _getCategoryColor(beacon.equipmentCategory),
+                    size: 28,
                   ),
                 ),
-              ),
-              Text(
-                beacon.name.isEmpty ? 'Unknown Beacon' : beacon.name,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        beacon.displayName,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        beacon.equipmentCategory ?? 'Medical Equipment',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.blueGrey[400],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 32),
+
+            // Distance Card
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    _getDistanceColor(beacon.distance).withValues(alpha: 0.08),
+                    _getDistanceColor(beacon.distance).withValues(alpha: 0.03),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: _getDistanceColor(beacon.distance).withValues(alpha: 0.15),
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'ID: ${beacon.id}',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontFamily: 'monospace',
-                  color: Colors.grey[600],
+              child: Column(
+                children: [
+                  Icon(
+                    _getDistanceIcon(beacon.distance),
+                    size: 40,
+                    color: _getDistanceColor(beacon.distance),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    beacon.distanceText,
+                    style: TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.w800,
+                      color: _getDistanceColor(beacon.distance),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    beacon.proximityGuide,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: Colors.blueGrey[500],
+                      fontWeight: FontWeight.w500,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Signal strength indicator
+            Row(
+              children: [
+                Text(
+                  'Signal Strength',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.blueGrey[400],
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  beacon.signalLabel,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: _getSignalColor(beacon.signalQuality),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: beacon.signalQuality,
+                minHeight: 8,
+                backgroundColor: Colors.grey[200],
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  _getSignalColor(beacon.signalQuality),
                 ),
               ),
-              const SizedBox(height: 24),
-              _buildDetailRow('RSSI', '${beacon.rssi} dBm'),
-              _buildDetailRow('Zone', BeaconDevice.classifyZone(beacon.rssi, nearThreshold: _scanner.nearThreshold, farThreshold: _scanner.farThreshold)),
-              if (beacon.txPower != null)
-                _buildDetailRow('Tx Power', '${beacon.txPower} dBm'),
-              if (beacon.distance != null)
-                _buildDetailRow(
-                  'Est. Distance',
-                  '${beacon.distance!.toStringAsFixed(2)} m',
-                ),
-              const Divider(height: 32),
-              const Text(
-                'iBeacon Data',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 16),
-              if (beacon.uuid != null) ...[
-                _buildDetailRow('UUID', beacon.uuid!),
-                _buildDetailRow('Major', '${beacon.major}'),
-                _buildDetailRow('Minor', '${beacon.minor}'),
-              ] else
-                const Text(
-                  'No iBeacon data detected',
-                  style: TextStyle(color: Colors.grey),
-                ),
-              const Divider(height: 32),
-              const Text(
-                'Raw Manufacturer Data',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  beacon.rawData,
-                  style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              label,
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+  // ── Filter helpers ─────────────────────────────────────────────────────────
+
+  List<BeaconDevice> get _filteredBeacons {
+    if (_selectedMajorFilter == null) return _beacons;
+    return _beacons.where((b) => b.major == _selectedMajorFilter).toList();
   }
 
-  bool _filterByEsp32 = false;
+  void _clearFilter() {
+    setState(() {
+      _selectedMajorFilter = null;
+      _selectedEquipmentName = null;
+    });
+  }
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
+  void _selectEquipment(EquipmentInfo equipment) {
+    setState(() {
+      _selectedMajorFilter = equipment.major;
+      _selectedEquipmentName = equipment.name;
+    });
+    Navigator.pop(context); // close drawer
+  }
 
-  String get _lastUpdatedText {
-    if (_lastUpdated == null) return '—';
-    final diff = DateTime.now().difference(_lastUpdated!);
-    if (diff.inSeconds < 5) return 'Just now';
-    if (diff.inSeconds < 60) return '${diff.inSeconds}s ago';
-    return '${diff.inMinutes}m ago';
+  // ── Color/icon helpers ─────────────────────────────────────────────────────
+
+  Color _getSignalColor(double quality) {
+    if (quality >= 0.75) return const Color(0xFF00C853);
+    if (quality >= 0.5) return const Color(0xFFFFA000);
+    if (quality >= 0.25) return const Color(0xFFFF6D00);
+    return Colors.redAccent;
+  }
+
+  Color _getDistanceColor(double? distance) {
+    if (distance == null || distance < 0) return Colors.grey;
+    if (distance < 1.0) return const Color(0xFF00C853);
+    if (distance < 5.0) return const Color(0xFF0288D1);
+    if (distance < 15.0) return const Color(0xFFFFA000);
+    return Colors.redAccent;
+  }
+
+  IconData _getDistanceIcon(double? distance) {
+    if (distance == null || distance < 0) return Icons.help_outline;
+    if (distance < 1.0) return Icons.near_me;
+    if (distance < 5.0) return Icons.directions_walk;
+    if (distance < 15.0) return Icons.explore;
+    return Icons.map;
+  }
+
+  IconData _getCategoryIcon(String? category) {
+    switch (category) {
+      case 'Imaging Equipment':
+        return Icons.camera_alt_outlined;
+      case 'Patient Care':
+        return Icons.medical_services_outlined;
+      case 'Emergency Equipment':
+        return Icons.emergency_outlined;
+      case 'Monitoring Equipment':
+        return Icons.monitor_heart_outlined;
+      case 'Respiratory Equipment':
+        return Icons.air_outlined;
+      default:
+        return Icons.local_hospital_outlined;
+    }
+  }
+
+  Color _getCategoryColor(String? category) {
+    switch (category) {
+      case 'Imaging Equipment':
+        return const Color(0xFF5C6BC0);
+      case 'Patient Care':
+        return const Color(0xFF00897B);
+      case 'Emergency Equipment':
+        return Colors.redAccent;
+      case 'Monitoring Equipment':
+        return const Color(0xFF0288D1);
+      case 'Respiratory Equipment':
+        return const Color(0xFF7B1FA2);
+      default:
+        return const Color(0xFF00C853);
+    }
   }
 
   // ── Build ──────────────────────────────────────────────────────────────────
-
-  List<BeaconDevice> get _filteredBeacons {
-    if (!_filterByEsp32) return _beacons;
-    return _beacons.where((b) {
-      final name = b.name.toLowerCase();
-      return name.contains('esp32') || b.major != null;
-    }).toList();
-  }
 
   @override
   Widget build(BuildContext context) {
     final displayBeacons = _filteredBeacons;
 
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        toolbarHeight: 0,
-      ),
+      key: _scaffoldKey,
+      backgroundColor: const Color(0xFFF5F7FA),
+      
+      // ── Sidebar / Drawer ─────────────────────────────────────────────────
+      drawer: _buildDrawer(),
+      
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
-            // ── Header ───────────────────────────────────────────────────────
+            // ── App Bar ─────────────────────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const SizedBox(),
-                    Row(
-                      children: [
-                        // Server Settings button
-                        GestureDetector(
-                          onTap: _showServerUrlDialog,
-                          child: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.grey[100],
+                    // Hamburger menu
+                    GestureDetector(
+                      onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                      child: Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.06),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
                             ),
-                            child: Icon(Icons.settings, color: Colors.grey[800], size: 20),
-                          ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.grey[100],
-                          ),
-                          child: Icon(Icons.bluetooth, color: Colors.grey[800]),
+                        child: const Icon(Icons.menu_rounded, color: Colors.black87, size: 22),
+                      ),
+                    ),
+                    const Spacer(),
+                    // Title
+                    const Text(
+                      'Hospital Equipment\nTracker',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black87,
+                        height: 1.2,
+                      ),
+                    ),
+                    const Spacer(),
+                    // Scan toggle
+                    GestureDetector(
+                      onTap: _toggleScan,
+                      child: Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: _isScanning ? const Color(0xFF00C853) : Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _isScanning
+                                  ? const Color(0xFF00C853).withValues(alpha: 0.3)
+                                  : Colors.black.withValues(alpha: 0.06),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
-                      ],
+                        child: Icon(
+                          _isScanning ? Icons.stop_rounded : Icons.search_rounded,
+                          color: _isScanning ? Colors.white : Colors.black87,
+                          size: 22,
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 10, 24, 0),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Equipment Tracker',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Hospital BLE Beacon Monitor',
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: Colors.blueGrey[300],
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
 
-            // ── Pulsing indicator + stats row ────────────────────────────────
+            // ── Scanning indicator ──────────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 20,
-                  horizontal: 24,
-                ),
+                padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Column(
                   children: [
-                    // Pulse circle
                     Center(
                       child: ScaleTransition(
                         scale: _pulseAnimation,
                         child: Container(
-                          width: 90,
-                          height: 90,
+                          width: 72,
+                          height: 72,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: _isScanning
@@ -632,48 +720,28 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
                             boxShadow: _isScanning
                                 ? [
                                     BoxShadow(
-                                      color: const Color(
-                                        0xFF00C853,
-                                      ).withValues(alpha: 0.4),
-                                      blurRadius: 24,
-                                      spreadRadius: 4,
+                                      color: const Color(0xFF00C853).withValues(alpha: 0.35),
+                                      blurRadius: 20,
+                                      spreadRadius: 3,
                                     ),
                                   ]
                                 : [],
                           ),
                           child: Icon(
-                            _isScanning
-                                ? Icons.radar
-                                : Icons.bluetooth_disabled,
+                            _isScanning ? Icons.radar : Icons.bluetooth_disabled,
                             color: Colors.white,
-                            size: 40,
+                            size: 32,
                           ),
                         ),
                       ),
                     ),
-
-                    const SizedBox(height: 24),
-
-                    // Stats row
-                    IntrinsicHeight(
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _buildStatChip(
-                              label: 'Active Beacons',
-                              value: '${_beacons.length}',
-                              color: const Color(0xFF0288D1),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildStatChip(
-                              label: 'Last Updated',
-                              value: _lastUpdatedText,
-                              color: const Color(0xFF00897B),
-                            ),
-                          ),
-                        ],
+                    const SizedBox(height: 12),
+                    Text(
+                      _isScanning ? 'Scanning for equipment…' : 'Tap search to start',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.blueGrey[400],
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
@@ -681,98 +749,78 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
               ),
             ),
 
-            // ── Status + Controls ────────────────────────────────────────────
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _statusMessage,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.blueGrey[400],
+            // ── Filter banner (when equipment selected) ─────────────────────
+            if (_selectedEquipmentName != null)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0288D1).withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFF0288D1).withValues(alpha: 0.2),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Row(
+                    child: Row(
                       children: [
-                        // Toggle Filter
-                        FilterChip(
-                          label: const Text('ESP32 Only'),
-                          selected: _filterByEsp32,
-                          onSelected: (val) {
-                            setState(() => _filterByEsp32 = val);
-                          },
-                          selectedColor: const Color(
-                            0xFF00C853,
-                          ).withValues(alpha: 0.2),
-                          checkmarkColor: const Color(0xFF00C853),
-                          labelStyle: TextStyle(
-                            fontSize: 12,
-                            color: _filterByEsp32
-                                ? const Color(0xFF00695C)
-                                : Colors.grey[600],
+                        const Icon(Icons.filter_alt_rounded, size: 18, color: Color(0xFF0288D1)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Finding: $_selectedEquipmentName',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF0288D1),
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: _clearFilter,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0288D1).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Clear',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF0288D1),
+                              ),
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    // Prominent Scan Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: _toggleScan,
-                        icon: Icon(
-                          _isScanning ? Icons.stop : Icons.search,
-                          size: 20,
-                        ),
-                        label: Text(
-                          _isScanning ? 'Stop Scanning' : 'Start Scanning',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                        ),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: _isScanning
-                              ? Colors.redAccent
-                              : const Color(0xFF00C853),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-            // ── Divider ───────────────────────────────────────────────────────
+            // ── Section header ──────────────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
                 child: Row(
                   children: [
                     const Text(
-                      'Detected Beacons',
+                      'Nearby Equipment',
                       style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
                         color: Colors.black87,
                       ),
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: const Color(0xFF00C853).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
                         '${displayBeacons.length}',
@@ -788,9 +836,9 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
               ),
             ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 8)),
+            const SliverToBoxAdapter(child: SizedBox(height: 4)),
 
-            // ── Beacon list ───────────────────────────────────────────────────
+            // ── Equipment list ──────────────────────────────────────────────
             if (displayBeacons.isEmpty)
               SliverFillRemaining(
                 hasScrollBody: false,
@@ -798,15 +846,13 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
               )
             else
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate((_, i) {
                     return Padding(
                       padding: EdgeInsets.only(top: i == 0 ? 0 : 10),
-                      child: _BeaconCard(
+                      child: _EquipmentCard(
                         beacon: displayBeacons[i],
-                        nearThreshold: _scanner.nearThreshold,
-                        farThreshold: _scanner.farThreshold,
                         onTap: () => _showBeaconDetails(displayBeacons[i]),
                       ),
                     );
@@ -819,65 +865,167 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
     );
   }
 
+  // ── Drawer / Sidebar ───────────────────────────────────────────────────────
+
+  Widget _buildDrawer() {
+    final allEquipment = _equipmentMap.getAllEquipment();
+
+    return Drawer(
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.horizontal(right: Radius.circular(20)),
+      ),
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF00C853), Color(0xFF00E676)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.only(
+                  bottomRight: Radius.circular(24),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(Icons.local_hospital, color: Colors.white, size: 28),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Hospital Equipment\nTracker',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            // All Equipment option
+            _DrawerTile(
+              icon: Icons.dashboard_rounded,
+              label: 'All Equipment',
+              isSelected: _selectedMajorFilter == null,
+              onTap: () {
+                _clearFilter();
+                Navigator.pop(context);
+              },
+            ),
+
+            // Divider with section title
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+              child: Text(
+                'FIND EQUIPMENT',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.blueGrey[300],
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ),
+
+            // Equipment list
+            Expanded(
+              child: allEquipment.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.inventory_2_outlined, size: 40, color: Colors.grey[300]),
+                            const SizedBox(height: 12),
+                            Text(
+                              'No equipment registered.\nAdd equipment from the web dashboard.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 13, color: Colors.grey[400]),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: EdgeInsets.zero,
+                      itemCount: allEquipment.length,
+                      itemBuilder: (_, i) {
+                        final eq = allEquipment[i];
+                        final isSelected = _selectedMajorFilter == eq.major;
+                        return _DrawerTile(
+                          icon: _getCategoryIcon(eq.category),
+                          label: eq.name,
+                          subtitle: eq.category,
+                          isSelected: isSelected,
+                          onTap: () => _selectEquipment(eq),
+                        );
+                      },
+                    ),
+            ),
+
+            const Divider(height: 1),
+
+            // Server Settings
+            _DrawerTile(
+              icon: Icons.settings_rounded,
+              label: 'Server Settings',
+              onTap: () {
+                Navigator.pop(context);
+                _showServerUrlDialog();
+              },
+            ),
+
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            _isScanning ? Icons.radar : Icons.bluetooth_searching,
+            _isScanning ? Icons.radar : Icons.search_off_rounded,
             size: 56,
             color: Colors.grey[300],
           ),
           const SizedBox(height: 12),
           Text(
-            _isScanning ? 'Searching for beacons…' : 'Tap Scan to start',
+            _isScanning
+                ? 'Searching for nearby equipment…'
+                : 'Tap search button to start',
             style: TextStyle(color: Colors.grey[400], fontSize: 14),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatChip({
-    required String label,
-    required String value,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.blueGrey[500],
-              fontWeight: FontWeight.w600,
+          if (_selectedEquipmentName != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'No "$_selectedEquipmentName" found nearby',
+              style: TextStyle(color: Colors.blueGrey[300], fontSize: 12),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-              maxLines: 1,
-            ),
-          ),
+          ],
         ],
       ),
     );
@@ -885,190 +1033,80 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Single beacon card widget
+//  Drawer tile widget
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _BeaconCard extends StatelessWidget {
-  final BeaconDevice beacon;
-  final int nearThreshold;
-  final int farThreshold;
+class _DrawerTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String? subtitle;
+  final bool isSelected;
   final VoidCallback? onTap;
-  const _BeaconCard({required this.beacon, this.nearThreshold = -65, this.farThreshold = -85, this.onTap});
 
-  Color get _signalColor {
-    final q = beacon.signalQuality;
-    if (q >= 0.75) return const Color(0xFF00C853);
-    if (q >= 0.5) return const Color(0xFFFFA000);
-    if (q >= 0.25) return const Color(0xFFFF6D00);
-    return Colors.redAccent;
-  }
+  const _DrawerTile({
+    required this.icon,
+    required this.label,
+    this.subtitle,
+    this.isSelected = false,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 0,
-      color: const Color(0xFFF8FAFB),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.withValues(alpha: 0.08)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        color: isSelected
+            ? const Color(0xFF00C853).withValues(alpha: 0.1)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
               children: [
-                // ── Top row: name + RSSI badge ──────────────────────────────────
-                Row(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: _signalColor.withValues(alpha: 0.12),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.bluetooth,
-                        color: _signalColor,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            beacon.name.isNotEmpty
-                                ? beacon.name
-                                : 'Unknown Device',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                              color: Colors.black87,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            beacon.id,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.blueGrey[400],
-                              fontFamily: 'monospace',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _signalColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '${beacon.rssi} dBm',
+                Icon(
+                  icon,
+                  size: 22,
+                  color: isSelected ? const Color(0xFF00C853) : Colors.blueGrey[400],
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
                         style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: _signalColor,
+                          fontSize: 14,
+                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                          color: isSelected ? const Color(0xFF00695C) : Colors.black87,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    _ZoneBadge(zone: BeaconDevice.classifyZone(beacon.rssi, nearThreshold: nearThreshold, farThreshold: farThreshold)),
-                    const SizedBox(width: 8),
-                    Icon(
-                      Icons.chevron_right,
-                      color: Colors.grey[400],
-                      size: 20,
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 10),
-
-                // ── Signal bar ──────────────────────────────────────────────────
-                Row(
-                  children: [
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: beacon.signalQuality,
-                          minHeight: 6,
-                          backgroundColor: Colors.grey[200],
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            _signalColor,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      beacon.signalLabel,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: _signalColor,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-
-                // ── iBeacon / Raw Data Preview ─────────────────────────────────
-                if (beacon.uuid != null) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.sensors, size: 10, color: Colors.blue),
-                        const SizedBox(width: 4),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 2),
                         Text(
-                          'iBeacon: Major ${beacon.major} | Minor ${beacon.minor}',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Colors.blue,
-                            fontWeight: FontWeight.w500,
+                          subtitle!,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.blueGrey[300],
                           ),
                         ),
                       ],
+                    ],
+                  ),
+                ),
+                if (isSelected)
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF00C853),
+                      shape: BoxShape.circle,
                     ),
                   ),
-                ] else if (beacon.rawData != '—') ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    beacon.rawData,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Colors.blueGrey[300],
-                      fontFamily: 'monospace',
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
               ],
             ),
           ),
@@ -1079,44 +1117,170 @@ class _BeaconCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Zone badge widget
+//  Equipment card widget (simplified, no technical jargon)
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _ZoneBadge extends StatelessWidget {
-  final String zone;
-  const _ZoneBadge({required this.zone});
+class _EquipmentCard extends StatelessWidget {
+  final BeaconDevice beacon;
+  final VoidCallback? onTap;
 
-  Color get _color {
-    switch (zone) {
-      case 'Near':
-        return const Color(0xFF00C853);
-      case 'Mid':
-        return const Color(0xFFFFA000);
-      case 'Far':
-        return Colors.redAccent;
+  const _EquipmentCard({required this.beacon, this.onTap});
+
+  Color get _signalColor {
+    final q = beacon.signalQuality;
+    if (q >= 0.75) return const Color(0xFF00C853);
+    if (q >= 0.5) return const Color(0xFFFFA000);
+    if (q >= 0.25) return const Color(0xFFFF6D00);
+    return Colors.redAccent;
+  }
+
+  IconData get _categoryIcon {
+    switch (beacon.equipmentCategory) {
+      case 'Imaging Equipment':
+        return Icons.camera_alt_outlined;
+      case 'Patient Care':
+        return Icons.medical_services_outlined;
+      case 'Emergency Equipment':
+        return Icons.emergency_outlined;
+      case 'Monitoring Equipment':
+        return Icons.monitor_heart_outlined;
+      case 'Respiratory Equipment':
+        return Icons.air_outlined;
       default:
-        return Colors.grey;
+        return Icons.local_hospital_outlined;
+    }
+  }
+
+  Color get _categoryColor {
+    switch (beacon.equipmentCategory) {
+      case 'Imaging Equipment':
+        return const Color(0xFF5C6BC0);
+      case 'Patient Care':
+        return const Color(0xFF00897B);
+      case 'Emergency Equipment':
+        return Colors.redAccent;
+      case 'Monitoring Equipment':
+        return const Color(0xFF0288D1);
+      case 'Respiratory Equipment':
+        return const Color(0xFF7B1FA2);
+      default:
+        return const Color(0xFF00C853);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: _color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _color.withValues(alpha: 0.3)),
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.withValues(alpha: 0.1)),
       ),
-      child: Text(
-        zone,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: _color,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Category icon
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: _categoryColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    _categoryIcon,
+                    color: _categoryColor,
+                    size: 24,
+                  ),
+                ),
+
+                const SizedBox(width: 14),
+
+                // Name + proximity guide
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        beacon.displayName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                          color: Colors.black87,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        beacon.proximityGuide,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.blueGrey[400],
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(width: 12),
+
+                // Distance display
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      beacon.distanceText,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: _signalColor,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    // Small signal dot
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: _signalColor,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          beacon.signalLabel,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: _signalColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+
+                const SizedBox(width: 4),
+                Icon(Icons.chevron_right_rounded, color: Colors.grey[300], size: 20),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 }
-
