@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Package, Settings, Search, Box, Radio, AlertTriangle, Lock, Unlock, Edit2, Wifi, Plus, Trash2, Shield, KeyRound, Eye, EyeOff } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { LayoutDashboard, Package, Settings, Search, Box, Radio, AlertTriangle, Lock, Unlock, Edit2, Wifi, Plus, Trash2, Shield, KeyRound, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import './index.css';
 
 // In production (served from Node.js on same domain/cloud host), use relative paths (empty string).
@@ -30,109 +30,134 @@ const Sidebar = ({ activeTab, setActiveTab }) => (
   </div>
 );
 
-const DashboardView = ({ liveData }) => (
-  <div className="content-area">
-    <div className="metrics-row">
-      <div className="metric-card">
-        <div className="metric-info">
-          <h3>Total Equipment</h3>
-          <div className="value">{liveData.length}</div>
+const DashboardView = ({ liveData, searchQuery }) => {
+  const filtered = useMemo(() => {
+    if (!searchQuery) return liveData;
+    const q = searchQuery.toLowerCase();
+    return liveData.filter(e =>
+      (e.name || '').toLowerCase().includes(q) ||
+      (e.id || '').toLowerCase().includes(q) ||
+      (e.location || '').toLowerCase().includes(q)
+    );
+  }, [liveData, searchQuery]);
+
+  return (
+    <div className="content-area">
+      <div className="metrics-row">
+        <div className="metric-card">
+          <div className="metric-info">
+            <h3>Total Equipment</h3>
+            <div className="value">{liveData.length}</div>
+          </div>
+          <div className="metric-icon blue"><Box /></div>
         </div>
-        <div className="metric-icon blue"><Box /></div>
-      </div>
-      <div className="metric-card">
-        <div className="metric-info">
-          <h3>Scanned Equipment</h3>
-          <div className="value">{liveData.filter(e => e.status === 'Active').length}</div>
+        <div className="metric-card">
+          <div className="metric-info">
+            <h3>Scanned Equipment</h3>
+            <div className="value">{liveData.filter(e => e.status === 'Active').length}</div>
+          </div>
+          <div className="metric-icon green"><Radio /></div>
         </div>
-        <div className="metric-icon green"><Radio /></div>
-      </div>
-      <div className="metric-card">
-        <div className="metric-info">
-          <h3>Missed Equipment</h3>
-          <div className="value">{liveData.filter(e => e.status === 'Inactive').length}</div>
+        <div className="metric-card">
+          <div className="metric-info">
+            <h3>Missed Equipment</h3>
+            <div className="value">{liveData.filter(e => e.status === 'Inactive').length}</div>
+          </div>
+          <div className="metric-icon red"><AlertTriangle /></div>
         </div>
-        <div className="metric-icon red"><AlertTriangle /></div>
+      </div>
+
+      <div className="section-wrapper">
+        <h2>Medical Equipment</h2>
+        <p>Real-time location and status of all tracked assets</p>
+      </div>
+
+      <div className="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Asset ID</th>
+              <th>Name</th>
+              <th>Current Location (Ward)</th>
+              <th>Last Seen</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr><td colSpan="4" style={{ textAlign: 'center', padding: '32px' }}>{searchQuery ? 'No matching equipment found' : 'Scanning for assets...'}</td></tr>
+            ) : (
+              filtered.map((eq) => (
+                <tr key={eq.id}>
+                  <td>{eq.id}</td>
+                  <td style={{ fontWeight: 500, color: '#1e293b' }}>{eq.name}</td>
+                  <td>{eq.location || 'Unknown'}</td>
+                  <td>{eq.lastSeen || 'Never'}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
+  );
+};
 
-    <div className="section-wrapper">
-      <h2>Medical Equipment</h2>
-      <p>Real-time location and status of all tracked assets</p>
-    </div>
+const EquipmentView = ({ liveData, searchQuery }) => {
+  const filtered = useMemo(() => {
+    if (!searchQuery) return liveData;
+    const q = searchQuery.toLowerCase();
+    return liveData.filter(e =>
+      (e.name || '').toLowerCase().includes(q) ||
+      (e.id || '').toLowerCase().includes(q) ||
+      (e.category || '').toLowerCase().includes(q) ||
+      (e.beaconId || '').toLowerCase().includes(q)
+    );
+  }, [liveData, searchQuery]);
 
-    <div className="table-container">
-      <table>
-        <thead>
-          <tr>
-            <th>Asset ID</th>
-            <th>Name</th>
-            <th>Current Location (Ward)</th>
-            <th>Last Seen</th>
-          </tr>
-        </thead>
-        <tbody>
-          {liveData.length === 0 ? (
-            <tr><td colSpan="4" style={{ textAlign: 'center', padding: '32px' }}>Scanning for assets...</td></tr>
-          ) : (
-            liveData.map((eq) => (
-              <tr key={eq.id}>
-                <td>{eq.id}</td>
-                <td style={{ fontWeight: 500, color: '#1e293b' }}>{eq.name}</td>
-                <td>{eq.location || 'Unknown'}</td>
-                <td>{eq.lastSeen || 'Never'}</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-  </div>
-);
+  return (
+    <div className="content-area">
+      <div className="section-wrapper">
+        <h2>All Equipment</h2>
+        <p>Complete list of medical equipment with beacon assignments and status</p>
+      </div>
 
-const EquipmentView = ({ liveData }) => (
-  <div className="content-area">
-    <div className="section-wrapper">
-      <h2>All Equipment</h2>
-      <p>Complete list of medical equipment with beacon assignments and status</p>
+      <div className="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Asset ID</th>
+              <th>Equipment Name</th>
+              <th>Major Value</th>
+              <th>Assigned Beacon ID</th>
+              <th>Category</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr><td colSpan="6" style={{ textAlign: 'center' }}>{searchQuery ? 'No matching equipment found' : 'No equipment data loaded'}</td></tr>
+            ) : (
+              filtered.map((eq) => (
+                <tr key={eq.id}>
+                  <td>{eq.id}</td>
+                  <td style={{ fontWeight: 500, color: '#1e293b' }}>{eq.name}</td>
+                  <td>{eq.major}</td>
+                  <td>{eq.beaconId}</td>
+                  <td>{eq.category}</td>
+                  <td>
+                    <span className={`status-pill status-${(eq.status || 'inactive').toLowerCase()}`}>
+                      {eq.status || 'Inactive'}
+                    </span>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
-
-    <div className="table-container">
-      <table>
-        <thead>
-          <tr>
-            <th>Asset ID</th>
-            <th>Equipment Name</th>
-            <th>Major Value</th>
-            <th>Assigned Beacon ID</th>
-            <th>Category</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {liveData.length === 0 ? (
-            <tr><td colSpan="5" style={{ textAlign: 'center' }}>No equipment data loaded</td></tr>
-          ) : (
-            liveData.map((eq) => (
-              <tr key={eq.id}>
-                <td>{eq.id}</td>
-                <td style={{ fontWeight: 500, color: '#1e293b' }}>{eq.name}</td>
-                <td>{eq.major}</td>
-                <td>{eq.beaconId}</td>
-                <td>{eq.category}</td>
-                <td>
-                  <span className={`status-pill status-${(eq.status || 'inactive').toLowerCase()}`}>
-                    {eq.status || 'Inactive'}
-                  </span>
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-  </div>
-);
+  );
+};
 
 // ────────────────────────────────────────────────────────────
 // SETTINGS VIEW (Admin) — Beacon Management + BSSID Locations
@@ -149,6 +174,10 @@ const SettingsView = ({ isUnlocked, setIsUnlocked, liveData }) => {
   const [showAddBeacon, setShowAddBeacon] = useState(false);
   const [newBeacon, setNewBeacon] = useState({ major: '', id: '', name: '', beaconId: '', category: '' });
   const [beaconMap, setBeaconMap] = useState({});
+
+  // Equipment search & sort state
+  const [eqSearch, setEqSearch] = useState('');
+  const [eqSortDir, setEqSortDir] = useState('asc'); // 'asc' | 'desc' | null
 
   useEffect(() => {
     if (isUnlocked) {
@@ -339,6 +368,28 @@ const SettingsView = ({ isUnlocked, setIsUnlocked, liveData }) => {
               </button>
             </div>
 
+            {/* Inline search & sort bar */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', alignItems: 'center' }}>
+              <div className="search-bar" style={{ flex: 1, width: 'auto' }}>
+                <Search size={16} color="#94a3b8" />
+                <input
+                  type="text"
+                  placeholder="Search equipment by name..."
+                  value={eqSearch}
+                  onChange={e => setEqSearch(e.target.value)}
+                />
+              </div>
+              <button
+                className="btn btn-outline"
+                onClick={() => setEqSortDir(prev => prev === 'asc' ? 'desc' : 'asc')}
+                style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
+                title={`Sort by name (${eqSortDir === 'asc' ? 'A→Z' : 'Z→A'})`}
+              >
+                {eqSortDir === 'asc' ? <ArrowUp size={15} /> : <ArrowDown size={15} />}
+                Name {eqSortDir === 'asc' ? 'A→Z' : 'Z→A'}
+              </button>
+            </div>
+
             {showAddBeacon && (
               <form onSubmit={handleAddBeacon} style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                 <div style={{ display: 'flex', gap: '8px' }}>
@@ -356,39 +407,60 @@ const SettingsView = ({ isUnlocked, setIsUnlocked, liveData }) => {
 
             <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
               {Object.keys(beaconMap).length === 0 && <div style={{ color: '#64748b', padding: '16px', textAlign: 'center' }}>No beacons registered yet.</div>}
-              {Object.entries(beaconMap).map(([majorKey, info]) => {
-                const live = liveData.find(d => d.id === info.id);
-                const status = live ? live.status : 'Inactive';
-                const location = live ? live.location : 'Not scanned';
-                return (
-                  <div key={majorKey} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: '1px solid #e2e8f0' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#1e293b' }}>
-                        {info.name || 'Unnamed'} <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 400 }}>({info.id})</span>
+              {(() => {
+                // Filter & sort beacon entries
+                let entries = Object.entries(beaconMap);
+                if (eqSearch) {
+                  const q = eqSearch.toLowerCase();
+                  entries = entries.filter(([, info]) =>
+                    (info.name || '').toLowerCase().includes(q) ||
+                    (info.id || '').toLowerCase().includes(q)
+                  );
+                }
+                entries.sort((a, b) => {
+                  const nameA = (a[1].name || '').toLowerCase();
+                  const nameB = (b[1].name || '').toLowerCase();
+                  return eqSortDir === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+                });
+
+                if (entries.length === 0 && eqSearch) {
+                  return <div style={{ color: '#64748b', padding: '16px', textAlign: 'center' }}>No equipment matching "{eqSearch}"</div>;
+                }
+
+                return entries.map(([majorKey, info]) => {
+                  const live = liveData.find(d => d.id === info.id);
+                  const status = live ? live.status : 'Inactive';
+                  const location = live ? live.location : 'Not scanned';
+                  return (
+                    <div key={majorKey} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: '1px solid #e2e8f0' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#1e293b' }}>
+                          {info.name || 'Unnamed'} <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 400 }}>({info.id})</span>
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '10px', marginTop: '5px', flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 700, color: '#2563eb', backgroundColor: '#eff6ff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.78rem' }}>Major: {majorKey}</span>
+                          <span style={{ color: '#94a3b8' }}>|</span>
+                          <span>Label: {info.beaconId || 'N/A'}</span>
+                          <span style={{ color: '#94a3b8' }}>|</span>
+                          <span>{info.category || 'General'}</span>
+                          <span style={{ color: '#94a3b8' }}>|</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: status === 'Active' ? '#22c55e' : '#cbd5e1', display: 'inline-block' }}></span>
+                            {status} — {location}
+                          </span>
+                        </div>
                       </div>
-                      <div style={{ fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '10px', marginTop: '5px', flexWrap: 'wrap' }}>
-                        <span style={{ fontWeight: 700, color: '#2563eb', backgroundColor: '#eff6ff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.78rem' }}>Major: {majorKey}</span>
-                        <span style={{ color: '#94a3b8' }}>|</span>
-                        <span>Label: {info.beaconId || 'N/A'}</span>
-                        <span style={{ color: '#94a3b8' }}>|</span>
-                        <span>{info.category || 'General'}</span>
-                        <span style={{ color: '#94a3b8' }}>|</span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: status === 'Active' ? '#22c55e' : '#cbd5e1', display: 'inline-block' }}></span>
-                          {status} — {location}
-                        </span>
-                      </div>
+                      <button
+                        onClick={() => deleteBeacon(majorKey)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '8px', marginLeft: '12px' }}
+                        title={`Delete beacon Major ${majorKey}`}
+                      >
+                        <Trash2 size={18} />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => deleteBeacon(majorKey)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '8px', marginLeft: '12px' }}
-                      title={`Delete beacon Major ${majorKey}`}
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
           </div>
 
@@ -709,6 +781,12 @@ function App() {
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [isSuperadminUnlocked, setIsSuperadminUnlocked] = useState(false);
   const [liveData, setLiveData] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Clear search when switching tabs
+  useEffect(() => {
+    setSearchQuery('');
+  }, [activeTab]);
 
   // Setup polling to the server every 2 seconds
   useEffect(() => {
@@ -734,6 +812,7 @@ function App() {
     if (activeTab === 'superadmin') return { title: 'System Core', subtitle: 'Signal calibration, system maintenance, and account management' };
   };
 
+  const showHeaderSearch = activeTab === 'dashboard' || activeTab === 'equipment';
   const headerInfo = renderHeaderTitle();
 
   return (
@@ -746,14 +825,21 @@ function App() {
             <div className="header-title">{headerInfo.title}</div>
             <div className="header-subtitle">{headerInfo.subtitle}</div>
           </div>
-          <div className="search-bar">
-            <Search size={18} color="#94a3b8" />
-            <input type="text" placeholder="Search equipment..." />
-          </div>
+          {showHeaderSearch && (
+            <div className="search-bar">
+              <Search size={18} color="#94a3b8" />
+              <input
+                type="text"
+                placeholder="Search equipment..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+              />
+            </div>
+          )}
         </div>
 
-        {activeTab === 'dashboard' && <DashboardView liveData={liveData} />}
-        {activeTab === 'equipment' && <EquipmentView liveData={liveData} />}
+        {activeTab === 'dashboard' && <DashboardView liveData={liveData} searchQuery={searchQuery} />}
+        {activeTab === 'equipment' && <EquipmentView liveData={liveData} searchQuery={searchQuery} />}
         {activeTab === 'settings' && <SettingsView isUnlocked={isAdminUnlocked} setIsUnlocked={setIsAdminUnlocked} liveData={liveData} />}
         {activeTab === 'superadmin' && <SuperadminView isUnlocked={isSuperadminUnlocked} setIsUnlocked={setIsSuperadminUnlocked} liveData={liveData} />}
       </div>

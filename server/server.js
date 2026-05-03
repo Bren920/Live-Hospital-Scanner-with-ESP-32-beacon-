@@ -126,7 +126,7 @@ app.post('/api/scan', (req, res) => {
   if (bssid) {
     // Some devices might report BSSID with different casing or missing quotes
     const normalizedBssid = bssid.toLowerCase().replace(/"/g, '');
-    
+
     // Find a match case-insensitively
     const matchKey = Object.keys(locationMap).find(
       key => key.toLowerCase() === normalizedBssid
@@ -155,7 +155,7 @@ app.post('/api/scan', (req, res) => {
   const mappedEquipment = equipmentMap[major.toString()];
 
   if (mappedEquipment) {
-    // We found it! Register it as "Active" right now.
+
     activeEquipment[mappedEquipment.id] = {
       ...mappedEquipment,
       rssi: rssi,
@@ -228,11 +228,11 @@ app.post('/api/locations', (req, res) => {
   if (!bssid || !location) {
     return res.status(400).json({ error: "Missing bssid or location in payload" });
   }
-  
+
   // Normalize the BSSID to lowercase before saving so it matches the scan logic
   const normalizedBssid = bssid.toLowerCase().replace(/"/g, '');
   locationMap[normalizedBssid] = location;
-  
+
   try {
     fs.writeFileSync(LOCATION_FILE, JSON.stringify(locationMap, null, 2));
   } catch (error) {
@@ -263,13 +263,13 @@ app.get('/api/equipment/map', (req, res) => {
 // Endpoint: Adding or Updating Equipment Map
 app.post('/api/equipment', (req, res) => {
   const { major, id, name, beaconId, category } = req.body;
-  
+
   if (!major || !id) {
     return res.status(400).json({ error: "Missing major or id in payload" });
   }
-  
+
   equipmentMap[major] = { id, name: name || 'Unknown', beaconId: beaconId || '', category: category || 'General' };
-  
+
   try {
     fs.writeFileSync(EQUIPMENT_FILE, JSON.stringify(equipmentMap, null, 2));
   } catch (error) {
@@ -287,7 +287,7 @@ app.delete('/api/equipment/:major', (req, res) => {
       delete activeEquipment[eqId];
     }
     delete equipmentMap[major];
-    
+
     try {
       fs.writeFileSync(EQUIPMENT_FILE, JSON.stringify(equipmentMap, null, 2));
     } catch (error) {
