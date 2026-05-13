@@ -119,6 +119,7 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
     with SingleTickerProviderStateMixin {
   // Track which drawer categories are expanded
   final Set<String> _expandedCategories = {};
+  bool _isRefreshingEquipment = false;
   final _scanner = BeaconScannerService.instance;
   final _equipmentMap = EquipmentMapService.instance;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -557,6 +558,21 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
     Navigator.pop(context); // close drawer
   }
 
+  /// Fetch latest equipment from the server and rebuild the drawer
+  Future<void> _refreshEquipmentFromServer() async {
+    if (_isRefreshingEquipment) return;
+    setState(() => _isRefreshingEquipment = true);
+    try {
+      await _equipmentMap.fetchFromServer(_scanner.serverUrl);
+    } catch (e) {
+      // Silently fail — the drawer will still show cached equipment
+      print('Drawer equipment refresh failed: $e');
+    }
+    if (mounted) {
+      setState(() => _isRefreshingEquipment = false);
+    }
+  }
+
   // ── Color/icon helpers ─────────────────────────────────────────────────────
 
   Color _getSignalColor(double quality) {
@@ -640,7 +656,10 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
                   children: [
                     // Hamburger menu
                     GestureDetector(
-                      onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                      onTap: () {
+                        _scaffoldKey.currentState?.openDrawer();
+                        _refreshEquipmentFromServer();
+                      },
                       child: Container(
                         width: 42,
                         height: 42,
@@ -904,14 +923,40 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(Icons.local_hospital, color: Colors.white, size: 28),
+                  Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(Icons.local_hospital, color: Colors.white, size: 28),
+                      ),
+                      const Spacer(),
+                      // Sync / Refresh button
+                      GestureDetector(
+                        onTap: _refreshEquipmentFromServer,
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: _isRefreshingEquipment
+                              ? const Padding(
+                                  padding: EdgeInsets.all(8),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                )
+                              : const Icon(Icons.sync_rounded, color: Colors.white, size: 20),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   const Text(
@@ -923,6 +968,17 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
                       height: 1.3,
                     ),
                   ),
+                  if (_isRefreshingEquipment)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Syncing equipment…',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.white.withValues(alpha: 0.8),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
