@@ -117,6 +117,8 @@ class EquipmentTrackerScreen extends StatefulWidget {
 
 class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
     with SingleTickerProviderStateMixin {
+  // Track which drawer categories are expanded
+  final Set<String> _expandedCategories = {};
   final _scanner = BeaconScannerService.instance;
   final _equipmentMap = EquipmentMapService.instance;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -870,6 +872,12 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
   Widget _buildDrawer() {
     final allEquipment = _equipmentMap.getAllEquipment();
 
+    // Group equipment by category
+    final Map<String, List<EquipmentInfo>> grouped = {};
+    for (final eq in allEquipment) {
+      grouped.putIfAbsent(eq.category, () => []).add(eq);
+    }
+
     return Drawer(
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
@@ -946,7 +954,7 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
               ),
             ),
 
-            // Equipment list
+            // Equipment list grouped by category with dropdowns
             Expanded(
               child: allEquipment.isEmpty
                   ? Center(
@@ -966,20 +974,38 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
                         ),
                       ),
                     )
-                  : ListView.builder(
+                  : ListView(
                       padding: EdgeInsets.zero,
-                      itemCount: allEquipment.length,
-                      itemBuilder: (_, i) {
-                        final eq = allEquipment[i];
-                        final isSelected = _selectedMajorFilter == eq.major;
-                        return _DrawerTile(
-                          icon: _getCategoryIcon(eq.category),
-                          label: eq.name,
-                          subtitle: eq.category,
-                          isSelected: isSelected,
-                          onTap: () => _selectEquipment(eq),
+                      children: grouped.entries.map((entry) {
+                        final category = entry.key;
+                        final items = entry.value;
+                        final isExpanded = _expandedCategories.contains(category);
+
+                        return _DrawerCategorySection(
+                          category: category,
+                          icon: _getCategoryIcon(category),
+                          color: _getCategoryColor(category),
+                          isExpanded: isExpanded,
+                          onToggle: () {
+                            setState(() {
+                              if (isExpanded) {
+                                _expandedCategories.remove(category);
+                              } else {
+                                _expandedCategories.add(category);
+                              }
+                            });
+                          },
+                          children: items.map((eq) {
+                            final isSelected = _selectedMajorFilter == eq.major;
+                            return _DrawerTile(
+                              icon: _getCategoryIcon(eq.category),
+                              label: eq.name,
+                              isSelected: isSelected,
+                              onTap: () => _selectEquipment(eq),
+                            );
+                          }).toList(),
                         );
-                      },
+                      }).toList(),
                     ),
             ),
 
@@ -1112,6 +1138,116 @@ class _DrawerTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Drawer category section (expandable/collapsible dropdown)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _DrawerCategorySection extends StatelessWidget {
+  final String category;
+  final IconData icon;
+  final Color color;
+  final bool isExpanded;
+  final VoidCallback onToggle;
+  final List<Widget> children;
+
+  const _DrawerCategorySection({
+    required this.category,
+    required this.icon,
+    required this.color,
+    required this.isExpanded,
+    required this.onToggle,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Category header (tappable to expand/collapse)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+          child: Material(
+            color: isExpanded ? color.withValues(alpha: 0.06) : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            child: InkWell(
+              onTap: onToggle,
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(icon, size: 18, color: color),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        category,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: isExpanded ? color : Colors.black87,
+                        ),
+                      ),
+                    ),
+                    // Item count badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '${children.length}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: color,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Arrow indicator
+                    AnimatedRotation(
+                      turns: isExpanded ? 0.5 : 0.0,
+                      duration: const Duration(milliseconds: 200),
+                      child: Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 22,
+                        color: isExpanded ? color : Colors.blueGrey[300],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // Expandable children with animation
+        AnimatedCrossFade(
+          firstChild: const SizedBox.shrink(),
+          secondChild: Padding(
+            padding: const EdgeInsets.only(left: 20),
+            child: Column(children: children),
+          ),
+          crossFadeState:
+              isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          duration: const Duration(milliseconds: 200),
+          sizeCurve: Curves.easeInOut,
+        ),
+      ],
     );
   }
 }
