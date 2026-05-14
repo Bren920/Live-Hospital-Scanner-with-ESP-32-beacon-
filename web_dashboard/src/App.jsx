@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { LayoutDashboard, Package, Settings, Search, Box, Radio, AlertTriangle, Lock, Unlock, Edit2, Wifi, Plus, Trash2, Shield, KeyRound, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { LayoutDashboard, Package, Settings, Search, Box, Radio, AlertTriangle, Lock, Unlock, Edit2, Wifi, Plus, Trash2, Shield, KeyRound, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, Filter } from 'lucide-react';
 import './index.css';
 
 // In production (served from Node.js on same domain/cloud host), use relative paths (empty string).
@@ -30,16 +30,22 @@ const Sidebar = ({ activeTab, setActiveTab }) => (
   </div>
 );
 
-const DashboardView = ({ liveData, searchQuery }) => {
+const DashboardView = ({ liveData, searchQuery, categoryFilter }) => {
   const filtered = useMemo(() => {
-    if (!searchQuery) return liveData;
-    const q = searchQuery.toLowerCase();
-    return liveData.filter(e =>
-      (e.name || '').toLowerCase().includes(q) ||
-      (e.id || '').toLowerCase().includes(q) ||
-      (e.location || '').toLowerCase().includes(q)
-    );
-  }, [liveData, searchQuery]);
+    let result = liveData;
+    if (categoryFilter && categoryFilter !== 'All') {
+      result = result.filter(e => (e.category || 'General') === categoryFilter);
+    }
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(e =>
+        (e.name || '').toLowerCase().includes(q) ||
+        (e.id || '').toLowerCase().includes(q) ||
+        (e.location || '').toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [liveData, searchQuery, categoryFilter]);
 
   return (
     <div className="content-area">
@@ -78,18 +84,20 @@ const DashboardView = ({ liveData, searchQuery }) => {
             <tr>
               <th>Asset ID</th>
               <th>Name</th>
+              <th>Category</th>
               <th>Current Location (Ward)</th>
               <th>Last Seen</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan="4" style={{ textAlign: 'center', padding: '32px' }}>{searchQuery ? 'No matching equipment found' : 'Scanning for assets...'}</td></tr>
+              <tr><td colSpan="5" style={{ textAlign: 'center', padding: '32px' }}>{searchQuery || categoryFilter !== 'All' ? 'No matching equipment found' : 'Scanning for assets...'}</td></tr>
             ) : (
               filtered.map((eq) => (
                 <tr key={eq.id}>
                   <td>{eq.id}</td>
                   <td style={{ fontWeight: 500, color: '#1e293b' }}>{eq.name}</td>
+                  <td>{eq.category || 'General'}</td>
                   <td>{eq.location || 'Unknown'}</td>
                   <td>{eq.lastSeen || 'Never'}</td>
                 </tr>
@@ -102,17 +110,23 @@ const DashboardView = ({ liveData, searchQuery }) => {
   );
 };
 
-const EquipmentView = ({ liveData, searchQuery }) => {
+const EquipmentView = ({ liveData, searchQuery, categoryFilter }) => {
   const filtered = useMemo(() => {
-    if (!searchQuery) return liveData;
-    const q = searchQuery.toLowerCase();
-    return liveData.filter(e =>
-      (e.name || '').toLowerCase().includes(q) ||
-      (e.id || '').toLowerCase().includes(q) ||
-      (e.category || '').toLowerCase().includes(q) ||
-      (e.beaconId || '').toLowerCase().includes(q)
-    );
-  }, [liveData, searchQuery]);
+    let result = liveData;
+    if (categoryFilter && categoryFilter !== 'All') {
+      result = result.filter(e => (e.category || 'General') === categoryFilter);
+    }
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(e =>
+        (e.name || '').toLowerCase().includes(q) ||
+        (e.id || '').toLowerCase().includes(q) ||
+        (e.category || '').toLowerCase().includes(q) ||
+        (e.beaconId || '').toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [liveData, searchQuery, categoryFilter]);
 
   return (
     <div className="content-area">
@@ -135,7 +149,7 @@ const EquipmentView = ({ liveData, searchQuery }) => {
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan="6" style={{ textAlign: 'center' }}>{searchQuery ? 'No matching equipment found' : 'No equipment data loaded'}</td></tr>
+              <tr><td colSpan="6" style={{ textAlign: 'center' }}>{searchQuery || categoryFilter !== 'All' ? 'No matching equipment found' : 'No equipment data loaded'}</td></tr>
             ) : (
               filtered.map((eq) => (
                 <tr key={eq.id}>
@@ -782,10 +796,18 @@ function App() {
   const [isSuperadminUnlocked, setIsSuperadminUnlocked] = useState(false);
   const [liveData, setLiveData] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('All');
 
-  // Clear search when switching tabs
+  // Derive unique categories from live data
+  const categories = useMemo(() => {
+    const cats = new Set(liveData.map(e => e.category || 'General'));
+    return ['All', ...Array.from(cats).sort()];
+  }, [liveData]);
+
+  // Clear search and filter when switching tabs
   useEffect(() => {
     setSearchQuery('');
+    setCategoryFilter('All');
   }, [activeTab]);
 
   // Setup polling to the server every 2 seconds
@@ -826,20 +848,33 @@ function App() {
             <div className="header-subtitle">{headerInfo.subtitle}</div>
           </div>
           {showHeaderSearch && (
-            <div className="search-bar">
-              <Search size={18} color="#94a3b8" />
-              <input
-                type="text"
-                placeholder="Search equipment..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-              />
+            <div className="header-controls">
+              <div className="category-filter">
+                <Filter size={16} color="#94a3b8" />
+                <select
+                  value={categoryFilter}
+                  onChange={e => setCategoryFilter(e.target.value)}
+                >
+                  {categories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="search-bar">
+                <Search size={18} color="#94a3b8" />
+                <input
+                  type="text"
+                  placeholder="Search equipment..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                />
+              </div>
             </div>
           )}
         </div>
 
-        {activeTab === 'dashboard' && <DashboardView liveData={liveData} searchQuery={searchQuery} />}
-        {activeTab === 'equipment' && <EquipmentView liveData={liveData} searchQuery={searchQuery} />}
+        {activeTab === 'dashboard' && <DashboardView liveData={liveData} searchQuery={searchQuery} categoryFilter={categoryFilter} />}
+        {activeTab === 'equipment' && <EquipmentView liveData={liveData} searchQuery={searchQuery} categoryFilter={categoryFilter} />}
         {activeTab === 'settings' && <SettingsView isUnlocked={isAdminUnlocked} setIsUnlocked={setIsAdminUnlocked} liveData={liveData} />}
         {activeTab === 'superadmin' && <SuperadminView isUnlocked={isSuperadminUnlocked} setIsUnlocked={setIsSuperadminUnlocked} liveData={liveData} />}
       </div>

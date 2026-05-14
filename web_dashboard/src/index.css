@@ -628,6 +628,34 @@ input[type=range] {
   background: linear-gradient(135deg, #6d28d9, #5b21b6);
 }
 
+/* Header Controls (filter + search side by side) */
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.category-filter {
+  display: flex;
+  align-items: center;
+  background-color: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 8px 12px;
+  gap: 8px;
+}
+
+.category-filter select {
+  border: none;
+  background: transparent;
+  outline: none;
+  color: var(--text-dark);
+  font-size: 0.85rem;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  padding-right: 4px;
+}
+
 select {
   cursor: pointer;
 }
