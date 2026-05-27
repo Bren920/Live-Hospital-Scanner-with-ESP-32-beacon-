@@ -662,3 +662,223 @@ select {
 select:focus {
   border-color: var(--primary-blue);
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE STYLES
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Hamburger button — hidden on desktop */
+.mobile-menu-btn {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-dark);
+  padding: 8px;
+  border-radius: 8px;
+  transition: background-color 0.2s;
+}
+.mobile-menu-btn:hover {
+  background-color: #f1f5f9;
+}
+
+/* Sidebar overlay backdrop — hidden on desktop */
+.sidebar-overlay {
+  display: none;
+}
+
+/* ── Tablet breakpoint (≤ 1024px) ─────────────────────────────── */
+@media (max-width: 1024px) {
+  .metrics-row {
+    flex-wrap: wrap;
+  }
+  .metric-card {
+    flex: 1 1 calc(50% - 12px);
+    min-width: 200px;
+  }
+  .content-area {
+    padding: 24px;
+  }
+  .top-header {
+    padding: 0 20px;
+  }
+  .search-bar {
+    width: 220px;
+  }
+  .settings-row {
+    flex-direction: column;
+  }
+}
+
+/* ── Mobile breakpoint (≤ 768px) ──────────────────────────────── */
+@media (max-width: 768px) {
+  /* Show hamburger */
+  .mobile-menu-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Sidebar becomes a slide-out overlay */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: -280px;
+    width: 260px;
+    height: 100vh;
+    z-index: 1000;
+    transition: left 0.3s ease;
+    box-shadow: none;
+  }
+  .sidebar.open {
+    left: 0;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25);
+  }
+
+  /* Dark overlay behind sidebar */
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 999;
+  }
+  .sidebar-overlay.visible {
+    display: block;
+  }
+
+  /* Main content takes full width */
+  .main-content {
+    width: 100%;
+  }
+
+  /* Top header stacks on mobile */
+  .top-header {
+    height: auto;
+    min-height: 60px;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px 16px;
+  }
+
+  .header-title-wrapper {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .header-title {
+    font-size: 1.05rem;
+  }
+  .header-subtitle {
+    font-size: 0.75rem;
+  }
+
+  /* Search and filter stack below title */
+  .header-controls {
+    width: 100%;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .search-bar {
+    width: 100%;
+  }
+  .category-filter {
+    width: 100%;
+  }
+  .category-filter select {
+    flex: 1;
+  }
+
+  /* Content area tighter padding */
+  .content-area {
+    padding: 16px;
+  }
+
+  /* Metric cards stack vertically */
+  .metrics-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .metric-card {
+    flex: none;
+    width: 100%;
+  }
+
+  /* Tables scroll horizontally */
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  table {
+    min-width: 600px;
+  }
+  th, td {
+    padding: 12px 14px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  /* Settings forms adapt */
+  .settings-card {
+    padding: 16px;
+  }
+  .settings-card-header {
+    font-size: 0.9rem;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* BSSID form stacks */
+  .settings-card form[style] {
+    flex-direction: column !important;
+  }
+
+  /* Auth modal fits mobile */
+  .auth-modal {
+    width: calc(100% - 32px);
+    max-width: 400px;
+    padding: 24px;
+  }
+
+  /* Chart adjustments */
+  .chart-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Slider adjustments */
+  .slider-group-header {
+    font-size: 0.8rem;
+  }
+
+  /* Add-beacon form stacks on mobile */
+  .settings-card form div[style*="display: flex"][style*="gap: 8px"] {
+    flex-direction: column !important;
+  }
+}
+
+/* ── Small phone (≤ 480px) ────────────────────────────────────── */
+@media (max-width: 480px) {
+  .metric-card {
+    padding: 16px;
+  }
+  .metric-info .value {
+    font-size: 1.25rem;
+  }
+  .metric-icon {
+    width: 40px;
+    height: 40px;
+  }
+  .section-wrapper > h2 {
+    font-size: 1rem;
+  }
+  .content-area {
+    padding: 12px;
+  }
+  .top-header {
+    padding: 10px 12px;
+  }
+}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { LayoutDashboard, Package, Settings, Search, Box, Radio, AlertTriangle, Lock, Unlock, Edit2, Wifi, Plus, Trash2, Shield, KeyRound, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, Filter } from 'lucide-react';
+import { LayoutDashboard, Package, Settings, Search, Box, Radio, AlertTriangle, Lock, Unlock, Edit2, Wifi, Plus, Trash2, Shield, KeyRound, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, Filter, Menu, X } from 'lucide-react';
 import './index.css';
 
 // In production (served from Node.js on same domain/cloud host), use relative paths (empty string).
@@ -8,27 +8,36 @@ const isViteDev = window.location.port === '5173' || window.location.port === '5
 const API = isViteDev ? `http://${window.location.hostname}:3000` : '';
 
 // Components
-const Sidebar = ({ activeTab, setActiveTab }) => (
-  <div className="sidebar">
-    <div className="sidebar-header">
-      Hospital Asset<br />Tracker
-    </div>
-    <div className="sidebar-nav">
-      <div className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
-        <LayoutDashboard size={20} /> Dashboard
+const Sidebar = ({ activeTab, setActiveTab, isOpen, onClose }) => {
+  const handleNav = (tab) => {
+    setActiveTab(tab);
+    if (onClose) onClose();
+  };
+  return (
+    <>
+      <div className={`sidebar-overlay ${isOpen ? 'visible' : ''}`} onClick={onClose} />
+      <div className={`sidebar ${isOpen ? 'open' : ''}`}>
+        <div className="sidebar-header">
+          Hospital Asset<br />Tracker
+        </div>
+        <div className="sidebar-nav">
+          <div className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => handleNav('dashboard')}>
+            <LayoutDashboard size={20} /> Dashboard
+          </div>
+          <div className={`nav-item ${activeTab === 'equipment' ? 'active' : ''}`} onClick={() => handleNav('equipment')}>
+            <Package size={20} /> Equipment
+          </div>
+          <div className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => handleNav('settings')}>
+            <Settings size={20} /> Settings
+          </div>
+          <div className={`nav-item superadmin-nav ${activeTab === 'superadmin' ? 'active' : ''}`} onClick={() => handleNav('superadmin')}>
+            <Shield size={20} /> Superadmin
+          </div>
+        </div>
       </div>
-      <div className={`nav-item ${activeTab === 'equipment' ? 'active' : ''}`} onClick={() => setActiveTab('equipment')}>
-        <Package size={20} /> Equipment
-      </div>
-      <div className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
-        <Settings size={20} /> Settings
-      </div>
-      <div className={`nav-item superadmin-nav ${activeTab === 'superadmin' ? 'active' : ''}`} onClick={() => setActiveTab('superadmin')}>
-        <Shield size={20} /> Superadmin
-      </div>
-    </div>
-  </div>
-);
+    </>
+  );
+};
 
 const DashboardView = ({ liveData, searchQuery, categoryFilter }) => {
   const filtered = useMemo(() => {
@@ -797,6 +806,7 @@ function App() {
   const [liveData, setLiveData] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Derive unique categories from live data
   const categories = useMemo(() => {
@@ -839,10 +849,13 @@ function App() {
 
   return (
     <div className="app-container">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="main-content">
         <div className="top-header">
+          <button className="mobile-menu-btn" onClick={() => setSidebarOpen(true)}>
+            <Menu size={24} />
+          </button>
           <div className="header-title-wrapper">
             <div className="header-title">{headerInfo.title}</div>
             <div className="header-subtitle">{headerInfo.subtitle}</div>
