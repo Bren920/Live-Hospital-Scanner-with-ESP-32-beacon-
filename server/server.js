@@ -61,7 +61,7 @@ try {
   } else {
     calibrationSettings = {
       nearThreshold: -65,
-      farThreshold: -85,
+      farThreshold: -89,
       pathLossExponent: 2.5,
       txPowerCalibration: -59
     };
@@ -379,7 +379,7 @@ app.post('/api/system/reset', (req, res) => {
 
   // Reset calibration to defaults
   calibrationSettings.nearThreshold = -65;
-  calibrationSettings.farThreshold = -85;
+  calibrationSettings.farThreshold = -89;
   calibrationSettings.pathLossExponent = 2.5;
   calibrationSettings.txPowerCalibration = -59;
   fs.writeFileSync(CALIBRATION_FILE, JSON.stringify(calibrationSettings, null, 2));

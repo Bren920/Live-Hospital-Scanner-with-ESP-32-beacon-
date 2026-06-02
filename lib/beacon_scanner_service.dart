@@ -20,6 +20,29 @@ class BeaconScannerService {
   final StreamController<List<BeaconDevice>> _controller =
       StreamController<List<BeaconDevice>>.broadcast();
 
+  // ── RSSI Smoothing (Simple Moving Average) ─────────────────────────────────
+  // Stores the last N raw RSSI readings per device to smooth out BLE signal noise.
+  // This implements the SMA described in Table 3.3 of the FYP report.
+  final Map<String, List<int>> _rssiBuffer = {};
+  static const int _rssiWindowSize = 5;
+
+  /// Get smoothed RSSI using Simple Moving Average (SMA).
+  /// Formula: SMA = (Σ RSSI_i) / N, where N = window size (5)
+  int _getSmoothedRssi(String deviceId, int rawRssi) {
+    _rssiBuffer.putIfAbsent(deviceId, () => []);
+    final buffer = _rssiBuffer[deviceId]!;
+    buffer.add(rawRssi);
+
+    // Keep only the last N readings
+    while (buffer.length > _rssiWindowSize) {
+      buffer.removeAt(0);
+    }
+
+    // Calculate Simple Moving Average
+    final sum = buffer.reduce((a, b) => a + b);
+    return (sum / buffer.length).round();
+  }
+
   StreamSubscription<List<ScanResult>>? _scanSub;
   StreamSubscription<bool>? _scanningStateSub;
   bool _isScanning = false;
@@ -61,7 +84,7 @@ class BeaconScannerService {
   double _pathLossExponent = 2.5;
   int _txPowerCalibration = -59;
   int _nearThreshold = -65;
-  int _farThreshold = -85;
+  int _farThreshold = -89;
 
   // Public getters so the UI can use server calibration
   int get nearThreshold => _nearThreshold;
@@ -136,10 +159,13 @@ class BeaconScannerService {
         final equipmentName = _equipmentMap.getEquipmentName(major);
         final equipmentCategory = _equipmentMap.getCategory(major);
 
+        // Apply SMA smoothing to reduce BLE signal noise
+        final smoothedRssi = _getSmoothedRssi(id, result.rssi);
+
         final beacon = BeaconDevice(
           id: id,
           name: name,
-          rssi: result.rssi,
+          rssi: smoothedRssi,
           lastSeen: DateTime.now(),
           rawData: rawData,
           uuid: iBeaconData['uuid'],
@@ -147,7 +173,7 @@ class BeaconScannerService {
           minor: iBeaconData['minor'],
           txPower: iBeaconData['txPower'],
           distance: BeaconDevice.calculateDistance(
-            result.rssi,
+            smoothedRssi,
             iBeaconData['txPower'],
             pathLossExponent: _pathLossExponent,
             txPowerCalibration: _txPowerCalibration,
@@ -215,6 +241,8 @@ class BeaconScannerService {
     }
 
     // Keep beacons in memory so they remain visible after stop
+    // Clear RSSI smoothing buffer so next scan starts fresh
+    _rssiBuffer.clear();
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────

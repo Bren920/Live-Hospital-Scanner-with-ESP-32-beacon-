@@ -112,21 +112,37 @@ class BeaconDevice {
   @override
   int get hashCode => id.hashCode;
 
-  /// Helper to calculate distance based on RSSI and TxPower
-  /// Distance = 10 ^ ((TxPower - RSSI) / (10 * n))
-  /// n is the path loss exponent (typically 2.0 to 4.0)
-  /// txPowerCalibration overrides the beacon-reported txPower if provided
+  /// Helper to calculate distance based on RSSI and TxPower using the
+  /// Log-Distance Path Loss Model:
+  ///   Distance = 10 ^ ((TxPower - RSSI) / (10 * n))
+  ///
+  /// where:
+  ///   - TxPower = RSSI measured at exactly 1 meter (calibration reference)
+  ///   - RSSI = current signal strength reading (smoothed via SMA)
+  ///   - n = path loss exponent (2.0 = open space, 2.5-4.0 = indoors)
+  ///
+  /// txPowerCalibration overrides the beacon-reported txPower if provided.
+  /// Result is clamped to [0.1m, 100m] to avoid physically impossible values.
   static double calculateDistance(int rssi, int? txPower, {double pathLossExponent = 2.5, int? txPowerCalibration}) {
     final effectiveTxPower = txPowerCalibration ?? txPower;
     if (effectiveTxPower == null) return -1.0;
     if (rssi == 0) return -1.0;
+    if (pathLossExponent <= 0) return -1.0;
 
-    // Log-distance path loss model formula: Distance = 10 ^ ((TxPower - RSSI) / (10 * PathLossExponent))
-    return pow(10, (effectiveTxPower - rssi) / (10.0 * pathLossExponent)).toDouble();
+    // If RSSI is stronger than txPower, the device is less than 1m away.
+    // The formula still handles this correctly (result < 1.0).
+
+    // Log-distance path loss model formula
+    final distance = pow(10, (effectiveTxPower - rssi) / (10.0 * pathLossExponent)).toDouble();
+
+    // Clamp to physically reasonable BLE range:
+    // - Minimum 0.1m (10cm) — closer readings are noise
+    // - Maximum 100m — beyond practical BLE range
+    return distance.clamp(0.1, 100.0);
   }
 
   /// Classify the zone based on RSSI thresholds
-  static String classifyZone(int rssi, {int nearThreshold = -65, int farThreshold = -85}) {
+  static String classifyZone(int rssi, {int nearThreshold = -65, int farThreshold = -89}) {
     if (rssi >= nearThreshold) return 'Near';
     if (rssi >= farThreshold) return 'Mid';
     return 'Far';
