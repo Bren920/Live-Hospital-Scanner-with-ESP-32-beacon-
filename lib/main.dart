@@ -245,6 +245,9 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
 
   Future<void> _startScan() async {
     try {
+      // Start background service so scanning continues when screen turns off
+      FlutterBackgroundService().startService();
+
       setState(() {
         _statusMessage = 'Scanning for equipment…';
         _isScanning = true;
@@ -287,6 +290,9 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
   }
 
   Future<void> _stopScan() async {
+    // Stop the background service
+    FlutterBackgroundService().invoke('stopService');
+
     await _beaconSub?.cancel();
     _beaconSub = null;
     _uiUpdateTimer?.cancel();
