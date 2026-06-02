@@ -42,9 +42,12 @@ class BeaconDevice {
     return (clamped - minRssi) / (maxRssi - minRssi);
   }
 
+  /// Human-readable zone label.
   String get signalLabel {
-    if (rssi >= -65) return 'Near';
-    if (rssi >= -75) return 'Mid';
+    final q = signalQuality;
+    if (q >= 0.75) return 'Near';
+    if (q >= 0.5) return 'Mid';
+    if (q >= 0.25) return 'Far';
     return 'Far';
   }
 
