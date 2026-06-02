@@ -582,10 +582,11 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
   // ── Color/icon helpers ─────────────────────────────────────────────────────
 
   Color _getSignalColor(double quality) {
-    if (quality >= 0.75) return const Color(0xFF00C853);
-    if (quality >= 0.5) return const Color(0xFFFFA000);
-    if (quality >= 0.25) return const Color(0xFFFF6D00);
-    return Colors.redAccent;
+    // quality param kept for compatibility but unused now
+    // Colors align with zone labels
+    if (quality >= 0.59) return const Color(0xFF00C853);  // Near - green
+    if (quality >= 0.41) return const Color(0xFFFFA000);  // Mid - amber
+    return Colors.redAccent;                               // Far - red
   }
 
   Color _getDistanceColor(double? distance) {
@@ -1325,11 +1326,14 @@ class _EquipmentCard extends StatelessWidget {
   const _EquipmentCard({required this.beacon, this.onTap});
 
   Color get _signalColor {
-    final q = beacon.signalQuality;
-    if (q >= 0.75) return const Color(0xFF00C853);
-    if (q >= 0.5) return const Color(0xFFFFA000);
-    if (q >= 0.25) return const Color(0xFFFF6D00);
-    return Colors.redAccent;
+    switch (beacon.signalLabel) {
+      case 'Near':
+        return const Color(0xFF00C853);  // green
+      case 'Mid':
+        return const Color(0xFFFFA000);  // amber
+      default:
+        return Colors.redAccent;          // red
+    }
   }
 
   IconData get _categoryIcon {

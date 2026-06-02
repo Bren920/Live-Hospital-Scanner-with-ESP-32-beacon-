@@ -42,12 +42,11 @@ class BeaconDevice {
     return (clamped - minRssi) / (maxRssi - minRssi);
   }
 
-  /// Human-readable zone label.
+  /// Human-readable zone label based on RSSI thresholds.
+  /// Near: RSSI >= -59 dBm (< 1m), Mid: -71 to -59 dBm (1-3m), Far: < -71 dBm (> 3m)
   String get signalLabel {
-    final q = signalQuality;
-    if (q >= 0.75) return 'Near';
-    if (q >= 0.5) return 'Mid';
-    if (q >= 0.25) return 'Far';
+    if (rssi >= -59) return 'Near';
+    if (rssi >= -71) return 'Mid';
     return 'Far';
   }
 
