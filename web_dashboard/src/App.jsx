@@ -94,6 +94,7 @@ const DashboardView = ({ liveData, searchQuery, categoryFilter }) => {
               <th>Asset ID</th>
               <th>Name</th>
               <th>Category</th>
+              <th>Proximity</th>
               <th>Current Location (Ward)</th>
               <th>Last Seen</th>
             </tr>
@@ -107,6 +108,12 @@ const DashboardView = ({ liveData, searchQuery, categoryFilter }) => {
                   <td>{eq.id}</td>
                   <td style={{ fontWeight: 500, color: '#1e293b' }}>{eq.name}</td>
                   <td>{eq.category || 'General'}</td>
+                  <td>
+                    {eq.zone === 'Near' && <span className="zone-badge zone-near">Near</span>}
+                    {eq.zone === 'Mid' && <span className="zone-badge zone-mid">Mid</span>}
+                    {eq.zone === 'Far' && <span className="zone-badge zone-far">Far</span>}
+                    {(!eq.zone || eq.zone === 'Unknown') && <span style={{color: '#94a3b8'}}>Unknown</span>}
+                  </td>
                   <td>{eq.location || 'Unknown'}</td>
                   <td>{eq.lastSeen || 'Never'}</td>
                 </tr>
@@ -153,6 +160,7 @@ const EquipmentView = ({ liveData, searchQuery, categoryFilter }) => {
               <th>Major Value</th>
               <th>Assigned Beacon ID</th>
               <th>Category</th>
+              <th>Proximity</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -167,6 +175,12 @@ const EquipmentView = ({ liveData, searchQuery, categoryFilter }) => {
                   <td>{eq.major}</td>
                   <td>{eq.beaconId}</td>
                   <td>{eq.category}</td>
+                  <td>
+                    {eq.zone === 'Near' && <span className="zone-badge zone-near">Near</span>}
+                    {eq.zone === 'Mid' && <span className="zone-badge zone-mid">Mid</span>}
+                    {eq.zone === 'Far' && <span className="zone-badge zone-far">Far</span>}
+                    {(!eq.zone || eq.zone === 'Unknown') && <span style={{color: '#94a3b8'}}>-</span>}
+                  </td>
                   <td>
                     <span className={`status-pill status-${(eq.status || 'inactive').toLowerCase()}`}>
                       {eq.status || 'Inactive'}

@@ -42,13 +42,10 @@ class BeaconDevice {
     return (clamped - minRssi) / (maxRssi - minRssi);
   }
 
-  /// Human-readable signal label.
   String get signalLabel {
-    final q = signalQuality;
-    if (q >= 0.75) return 'Excellent';
-    if (q >= 0.5) return 'Good';
-    if (q >= 0.25) return 'Fair';
-    return 'Weak';
+    if (rssi >= -65) return 'Near';
+    if (rssi >= -75) return 'Mid';
+    return 'Far';
   }
 
   /// User-friendly proximity guide based on estimated distance.
