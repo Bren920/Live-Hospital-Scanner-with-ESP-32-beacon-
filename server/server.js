@@ -94,8 +94,19 @@ try {
 // Key = Asset ID (e.g. EQ-2024-001)
 const activeEquipment = {};
 
-// Helper to classify zone based on RSSI and calibration thresholds
-function classifyZone(rssi) {
+// Helper to classify zone based on estimated distance (matches mobile app zones)
+// Near: ≤1m, Mid: 1-3m, Far: >3m
+// Path Loss Exponent and Tx Power affect this because they change the distance
+// calculation on the mobile app before it sends the distance here.
+function classifyZoneByDistance(distance) {
+  if (distance == null || distance < 0) return 'Unknown';
+  if (distance <= 1.0) return 'Near';
+  if (distance <= 3.0) return 'Mid';
+  return 'Far';
+}
+
+// Legacy RSSI-based zone classification (used for RSSI chart visualization)
+function classifyZoneByRssi(rssi) {
   if (rssi == null) return 'Unknown';
   if (rssi >= calibrationSettings.nearThreshold) return 'Near';
   if (rssi >= calibrationSettings.farThreshold) return 'Mid';
@@ -196,7 +207,7 @@ app.get('/api/equipment', (req, res) => {
         location: liveData.location,
         distance: liveData.distance,
         rssi: liveData.rssi,
-        zone: classifyZone(liveData.rssi),
+        zone: classifyZoneByDistance(liveData.distance),
         lastSeen: getTimeAgo(liveData.lastSeenDate)
       });
     } else {

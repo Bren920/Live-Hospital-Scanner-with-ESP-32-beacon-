@@ -331,11 +331,7 @@ class BeaconScannerService {
                     'rssi': beacon.rssi,
                     'mac': beacon.id,
                     'distance': beacon.distance,
-                    'zone': BeaconDevice.classifyZone(
-                      beacon.rssi,
-                      nearThreshold: _nearThreshold,
-                      farThreshold: _farThreshold,
-                    ),
+                    'zone': beacon.signalLabel,
                     'location': selectedLocation,
                     'bssid': wifiBSSID,
                   }),
