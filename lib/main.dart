@@ -500,42 +500,7 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
               ),
             ),
 
-            const SizedBox(height: 24),
 
-            // Signal strength indicator
-            Row(
-              children: [
-                Text(
-                  'Signal Strength',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.blueGrey[400],
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  beacon.signalLabel,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: _getSignalColor(beacon.signalQuality),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: LinearProgressIndicator(
-                value: beacon.signalQuality,
-                minHeight: 8,
-                backgroundColor: Colors.grey[200],
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  _getSignalColor(beacon.signalQuality),
-                ),
-              ),
-            ),
           ],
         ),
       ),
@@ -581,20 +546,11 @@ class _EquipmentTrackerScreenState extends State<EquipmentTrackerScreen>
 
   // ── Color/icon helpers ─────────────────────────────────────────────────────
 
-  Color _getSignalColor(double quality) {
-    // quality param kept for compatibility but unused now
-    // Colors align with zone labels
-    if (quality >= 0.59) return const Color(0xFF00C853);  // Near - green
-    if (quality >= 0.41) return const Color(0xFFFFA000);  // Mid - amber
-    return Colors.redAccent;                               // Far - red
-  }
-
   Color _getDistanceColor(double? distance) {
     if (distance == null || distance < 0) return Colors.grey;
-    if (distance < 1.0) return const Color(0xFF00C853);
-    if (distance < 5.0) return const Color(0xFF0288D1);
-    if (distance < 15.0) return const Color(0xFFFFA000);
-    return Colors.redAccent;
+    if (distance <= 1.0) return const Color(0xFF00C853);   // Near - green
+    if (distance <= 3.0) return const Color(0xFFFFA000);   // Mid - orange
+    return Colors.redAccent;                                // Far - red
   }
 
   IconData _getDistanceIcon(double? distance) {
@@ -1326,14 +1282,11 @@ class _EquipmentCard extends StatelessWidget {
   const _EquipmentCard({required this.beacon, this.onTap});
 
   Color get _signalColor {
-    switch (beacon.signalLabel) {
-      case 'Near':
-        return const Color(0xFF00C853);  // green
-      case 'Mid':
-        return const Color(0xFFFFA000);  // amber
-      default:
-        return Colors.redAccent;          // red
-    }
+    final d = beacon.distance;
+    if (d == null || d < 0) return Colors.grey;
+    if (d <= 1.0) return const Color(0xFF00C853);   // Near - green
+    if (d <= 3.0) return const Color(0xFFFFA000);   // Mid - orange
+    return Colors.redAccent;                          // Far - red
   }
 
   IconData get _categoryIcon {
